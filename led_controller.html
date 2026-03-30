@@ -1,0 +1,1495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LED MATRIX CTRL</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0a0a0c;
+    --surface:  #111116;
+    --panel:    #16161e;
+    --border:   #2a2a38;
+    --accent:   #00e5ff;
+    --accent2:  #ff3c6e;
+    --accent3:  #b8ff3c;
+    --dim:      #3a3a50;
+    --text:     #c8c8e0;
+    --muted:    #5a5a78;
+    --mono:     'Share Tech Mono', monospace;
+    --sans:     'Barlow Condensed', sans-serif;
+    --W: 8;
+    --H: 24;
+    --cell: 22px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+  }
+
+  /* scanline overlay */
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px);
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ── Header ──────────────────────────────────────────── */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .status-bar {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+  }
+  .header-brightness {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .header-brightness .hdr-bright-label {
+    font-size: 10px; letter-spacing: 0.12em; color: var(--muted);
+  }
+  .header-brightness input[type="range"] {
+    width: 120px; -webkit-appearance: none; height: 2px;
+    background: var(--border); outline: none; cursor: pointer;
+  }
+  .header-brightness input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 12px; height: 12px; border-radius: 0;
+    background: var(--accent); cursor: pointer; box-shadow: 0 0 6px var(--accent);
+  }
+  #brightness-val { min-width: 22px; text-align: right; color: var(--accent); }
+  .status-indicator {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .status-led {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--dim); transition: background 0.3s, box-shadow 0.3s;
+  }
+  .status-led.connected { background: var(--accent3); box-shadow: 0 0 6px var(--accent3); }
+  .status-led.error     { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); animation: pulse 0.8s infinite; }
+
+  #ws-url-form { display: flex; gap: 6px; align-items: center; }
+  #ws-url { background: var(--panel); border: 1px solid var(--border); color: var(--text); font-family: var(--mono); font-size: 11px; padding: 4px 8px; width: 200px; outline: none; }
+  #ws-url:focus { border-color: var(--accent); }
+
+  /* ── Main layout ─────────────────────────────────────── */
+  .workspace {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 260px 1fr 260px;
+    gap: 0;
+  }
+
+  /* ── Panels ──────────────────────────────────────────── */
+  .panel {
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    overflow-y: auto;
+  }
+  .panel:last-child { border-right: none; border-left: 1px solid var(--border); }
+
+  .panel-title {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em;
+    color: var(--muted); padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+  }
+
+  /* ── Center canvas area ───────────────────────────────── */
+  .canvas-area {
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    padding: 32px 24px;
+    gap: 20px;
+    background: var(--bg);
+    overflow-y: auto;
+  }
+
+  .matrix-dual {
+    display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; align-items: flex-start;
+  }
+  .matrix-col { text-align: center; }
+  .mirror-hint { color: var(--muted); font-size: 9px; letter-spacing: 0.04em; font-weight: 400; }
+
+  .matrix-wrapper {
+    position: relative;
+  }
+  .matrix-label {
+    font-family: var(--mono); font-size: 10px; color: var(--muted);
+    margin-bottom: 6px; letter-spacing: 0.15em;
+  }
+
+  #matrix-canvas {
+    display: block;
+    image-rendering: pixelated;
+    cursor: crosshair;
+    border: 1px solid var(--border);
+    box-shadow: 0 0 40px rgba(0,229,255,0.05);
+  }
+
+  .matrix-info {
+    font-family: var(--mono); font-size: 10px; color: var(--muted);
+    margin-top: 6px; display: flex; gap: 12px;
+  }
+
+  /* ── Toolbar ─────────────────────────────────────────── */
+  .toolbar {
+    display: flex; gap: 6px; align-items: center;
+    padding: 8px 0;
+    flex-wrap: wrap; justify-content: center;
+  }
+
+  .tool-btn {
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--muted); font-family: var(--mono); font-size: 11px;
+    padding: 7px 14px; cursor: pointer; transition: all 0.15s;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .tool-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .tool-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+  .tool-btn.danger { border-color: transparent; }
+  .tool-btn.danger:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  /* ── Section blocks ──────────────────────────────────── */
+  .section { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+  .section-label {
+    font-family: var(--mono); font-size: 10px; color: var(--accent);
+    letter-spacing: 0.18em; margin-bottom: 10px; text-transform: uppercase;
+  }
+
+  /* ── Mode buttons ─────────────────────────────────────── */
+  .mode-grid { display: flex; flex-direction: column; gap: 4px; }
+  .mode-btn {
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); font-family: var(--sans); font-size: 14px; font-weight: 600;
+    padding: 9px 12px; cursor: pointer; text-align: left;
+    letter-spacing: 0.04em; transition: all 0.15s;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .mode-btn:hover { border-color: var(--accent); background: rgba(0,229,255,0.05); }
+  .mode-btn.active { border-color: var(--accent); background: rgba(0,229,255,0.1); color: var(--accent); }
+  .mode-btn .mode-tag { font-family: var(--mono); font-size: 9px; color: var(--muted); }
+  .mode-btn.active .mode-tag { color: var(--accent); opacity: 0.7; }
+
+  /* ── Animation grid ──────────────────────────────────── */
+  .anim-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .anim-btn {
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--muted); font-family: var(--mono); font-size: 10px;
+    padding: 8px 8px; cursor: pointer; transition: all 0.15s;
+    letter-spacing: 0.06em; text-align: center;
+  }
+  .anim-btn:hover { border-color: var(--accent3); color: var(--accent3); }
+  .anim-btn.active { background: rgba(184,255,60,0.1); border-color: var(--accent3); color: var(--accent3); }
+
+  /* ── Color picker ────────────────────────────────────── */
+  .color-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .color-swatch-grid { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+  .swatch {
+    width: 22px; height: 22px; cursor: pointer; border: 2px solid transparent;
+    transition: border-color 0.15s, transform 0.1s;
+  }
+  .swatch:hover { transform: scale(1.2); border-color: rgba(255,255,255,0.3); }
+  .swatch.active { border-color: #fff; }
+
+  input[type="color"] {
+    width: 36px; height: 30px; border: 1px solid var(--border);
+    background: var(--surface); cursor: pointer; padding: 2px;
+  }
+
+  /* ── Sliders ──────────────────────────────────────────── */
+  .slider-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
+  .slider-label { font-family: var(--mono); font-size: 10px; color: var(--muted); width: 80px; flex-shrink: 0; }
+  .slider-val { font-family: var(--mono); font-size: 11px; color: var(--accent); width: 28px; text-align: right; }
+  input[type="range"] {
+    flex: 1; -webkit-appearance: none; height: 2px;
+    background: var(--border); outline: none; cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px; border-radius: 0;
+    background: var(--accent); cursor: pointer; box-shadow: 0 0 6px var(--accent);
+  }
+
+  /* ── Upload area ─────────────────────────────────────── */
+  .upload-zone {
+    border: 1px dashed var(--border); padding: 20px 12px;
+    text-align: center; cursor: pointer; transition: all 0.2s;
+    position: relative;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent); background: rgba(0,229,255,0.04);
+  }
+  .upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .upload-zone p { font-family: var(--mono); font-size: 10px; color: var(--muted); line-height: 1.6; }
+
+  #upload-preview { max-width: 100%; margin-top: 10px; image-rendering: pixelated; }
+
+  /* ── Send button ──────────────────────────────────────── */
+  .send-btn {
+    width: 100%; background: var(--accent); border: none;
+    color: #000; font-family: var(--sans); font-weight: 900;
+    font-size: 16px; letter-spacing: 0.12em; padding: 12px;
+    cursor: pointer; text-transform: uppercase; transition: all 0.15s;
+    margin-top: 4px;
+  }
+  .send-btn:hover { background: #33ecff; box-shadow: 0 0 20px rgba(0,229,255,0.4); }
+  .send-btn:active { transform: scale(0.99); }
+  .send-btn:disabled { background: var(--dim); color: var(--muted); cursor: not-allowed; box-shadow: none; }
+
+  /* ── Log ──────────────────────────────────────────────── */
+  #log {
+    font-family: var(--mono); font-size: 10px; color: var(--muted);
+    padding: 10px 16px; line-height: 1.8;
+    height: 140px; overflow-y: auto; background: var(--bg);
+    border-top: 1px solid var(--border);
+  }
+  .log-line { display: flex; gap: 8px; }
+  .log-time { color: var(--dim); }
+  .log-ok { color: var(--accent3); }
+  .log-err { color: var(--accent2); }
+  .log-info { color: var(--accent); }
+
+  /* ── Misc ─────────────────────────────────────────────── */
+  .sep { height: 1px; background: var(--border); margin: 4px 0; }
+  .tag {
+    font-family: var(--mono); font-size: 9px; background: var(--surface);
+    border: 1px solid var(--border); color: var(--muted); padding: 2px 6px;
+    letter-spacing: 0.1em;
+  }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); }
+</style>
+</head>
+<body>
+
+<!-- ── Header ────────────────────────────────────────────────────────────── -->
+<header>
+  <div class="logo">
+    <span class="logo-dot"></span>
+    LED MATRIX CTRL
+    <span class="tag">8×24</span>
+  </div>
+  <div class="status-bar">
+    <div id="ws-url-form">
+      <input id="ws-url" type="text" value="ws://192.168.1.100:81" spellcheck="false">
+      <button class="tool-btn" id="connect-btn" onclick="toggleConnect()">CONNECT</button>
+    </div>
+    <div class="header-brightness" title="1–255. Very low values crush pale colors (only a few steps per channel).">
+      <span class="hdr-bright-label">BRIGHT</span>
+      <input type="range" id="brightness" min="1" max="255" value="128" oninput="onBrightness(this)">
+      <span id="brightness-val">128</span>
+    </div>
+    <div class="status-indicator">
+      <div class="status-led" id="status-led"></div>
+      <span id="status-text">OFFLINE</span>
+    </div>
+  </div>
+</header>
+
+<!-- ── Workspace ─────────────────────────────────────────────────────────── -->
+<div class="workspace">
+
+  <!-- LEFT PANEL: Modes + Animations -->
+  <div class="panel">
+    <div class="panel-title">// CONTROL</div>
+
+    <div class="section">
+      <div class="section-label">STRIPS</div>
+      <div class="mode-grid">
+        <button class="mode-btn active" id="pair-mirror" onclick="setPairMode(true)">MIRROR <span class="mode-tag">FACE</span></button>
+        <button class="mode-btn" id="pair-ind" onclick="setPairMode(false)">INDEPENDENT <span class="mode-tag">2×576 B</span></button>
+      </div>
+      <p style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:8px;line-height:1.5;">Mirror: one 8×24 buffer, right LED mirrors X. Independent: separate left/right (1152-byte binary).</p>
+    </div>
+
+    <div class="section">
+      <div class="section-label">MODE</div>
+      <div class="mode-grid">
+        <button class="mode-btn active" id="mode-draw"      onclick="setMode('draw')">   DRAW       <span class="mode-tag">MANUAL</span></button>
+        <button class="mode-btn"        id="mode-animate"   onclick="setMode('animate')">ANIMATE    <span class="mode-tag">AUTO</span></button>
+        <button class="mode-btn"        id="mode-image"     onclick="setMode('image')">  IMAGE      <span class="mode-tag">UPLOAD</span></button>
+        <button class="mode-btn"        id="mode-fill"      onclick="setMode('fill')">   FILL       <span class="mode-tag">SOLID</span></button>
+        <button class="mode-btn"        id="mode-off"       onclick="sendOff()">         OFF        <span class="mode-tag">BLANK</span></button>
+      </div>
+    </div>
+
+    <div class="section" id="section-anim" style="display:none">
+      <div class="section-label">ANIMATION</div>
+      <div class="anim-grid">
+        <button class="anim-btn active" id="anim-0" onclick="setAnim(0)">PIXEL<br>SWEEP</button>
+        <button class="anim-btn"        id="anim-1" onclick="setAnim(1)">ROW<br>SWEEP</button>
+        <button class="anim-btn"        id="anim-2" onclick="setAnim(2)">COL<br>SWEEP</button>
+        <button class="anim-btn"        id="anim-3" onclick="setAnim(3)">RAIN<br>BOW</button>
+      </div>
+    </div>
+
+    <div class="section" id="section-image" style="display:none">
+      <div class="section-label">IMAGE / ANIMATION</div>
+      <div class="upload-zone" id="upload-zone">
+        <input type="file" id="img-input" accept="image/*,image/gif,video/mp4,video/webm,video/quicktime,.gif,.mp4,.webm" onchange="handleImageUpload(event)">
+        <p>DROP FILE or browse<br><br>Still: PNG, JPEG, WebP…<br>GIF: decoded to frames<br>Video: MP4 / WebM (streamed)<br><br>Mirror: 8×24 · Independent: 16×24</p>
+      </div>
+      <canvas id="upload-preview" width="8" height="24" style="display:none; width:100%; margin-top:10px;"></canvas>
+      <p id="anim-status" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:8px;line-height:1.5;display:none;"></p>
+      <div id="anim-controls" style="display:none;margin-top:10px;">
+        <div class="slider-row" style="margin-bottom:8px;">
+          <span class="slider-label">FPS cap</span>
+          <input type="range" id="anim-fps" min="1" max="60" value="20" oninput="document.getElementById('anim-fps-val').textContent=this.value">
+          <span class="slider-val" id="anim-fps-val">20</span>
+        </div>
+        <label style="font-family:var(--mono);font-size:10px;color:var(--muted);display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:10px;">
+          <input type="checkbox" id="anim-loop" checked> LOOP
+        </label>
+        <button class="send-btn" id="play-anim-btn" onclick="playAnimationStream()" disabled style="margin-top:0;">STREAM TO MATRIX</button>
+        <button class="tool-btn" id="stop-anim-btn" onclick="stopAnimationStream()" style="width:100%;margin-top:6px;justify-content:center;display:none;">STOP STREAM</button>
+      </div>
+      <button class="send-btn" id="send-image-btn" onclick="sendImage()" disabled style="margin-top:8px;">SEND STILL FRAME</button>
+    </div>
+
+    <div class="section" id="section-fill" style="display:none">
+      <div class="section-label">FILL COLOR</div>
+      <div class="color-row">
+        <input type="color" id="fill-color" value="#00e5ff" oninput="fillPreview()">
+        <span style="font-family:var(--mono);font-size:11px;color:var(--text)">SELECT COLOR</span>
+      </div>
+      <button class="send-btn" onclick="sendFill()">FILL MATRIX</button>
+    </div>
+
+    <div style="flex:1"></div>
+  </div>
+
+  <!-- CENTER: Matrix Canvas -->
+  <div class="canvas-area">
+    <div id="wrap-single">
+      <div class="matrix-label">// MATRIX PREVIEW — 8 × 24 <span class="mirror-hint">(mirrored to right strip)</span></div>
+      <div class="matrix-wrapper">
+        <canvas id="matrix-canvas" width="8" height="24"></canvas>
+      </div>
+    </div>
+    <div id="wrap-dual" class="matrix-dual" style="display:none">
+      <div class="matrix-col">
+        <div class="matrix-label">LEFT · PIN 5</div>
+        <div class="matrix-wrapper">
+          <canvas id="matrix-canvas-left" width="8" height="24"></canvas>
+        </div>
+      </div>
+      <div class="matrix-col">
+        <div class="matrix-label">RIGHT · PIN 18</div>
+        <div class="matrix-wrapper">
+          <canvas id="matrix-canvas-right" width="8" height="24"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="matrix-info">
+      <span id="cursor-pos">X:- Y:-</span>
+      <span id="pixel-count">0 px painted</span>
+    </div>
+
+    <div class="toolbar">
+      <button class="tool-btn active" id="tool-pencil" onclick="setTool('pencil')" title="Pencil">✏ PENCIL</button>
+      <button class="tool-btn" id="tool-fill-bucket" onclick="setTool('fill')"   title="Bucket fill">◈ BUCKET</button>
+      <button class="tool-btn" id="tool-eraser" onclick="setTool('eraser')"      title="Eraser">◻ ERASE</button>
+      <button class="tool-btn" id="tool-eyedrop" onclick="setTool('eyedrop')"    title="Eyedropper">⊕ PICK</button>
+      <button class="tool-btn danger" onclick="clearCanvas()">✕ CLEAR</button>
+      <button class="send-btn" style="width:auto;padding:7px 20px;margin:0;" onclick="sendDraw()">▶ PUSH</button>
+    </div>
+
+    <!-- Draw color palette -->
+    <div style="width:100%; max-width:340px;">
+      <div class="section-label" style="font-size:10px;color:var(--accent);letter-spacing:0.18em;margin-bottom:8px;">DRAW COLOR</div>
+      <div class="color-swatch-grid" id="palette"></div>
+      <div class="color-row">
+        <input type="color" id="draw-color" value="#00e5ff" oninput="onDrawColorChange(this.value)">
+        <span style="font-family:var(--mono);font-size:11px;color:var(--text)" id="draw-color-hex">#00E5FF</span>
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div id="log" style="width:100%; max-width:600px;"></div>
+  </div>
+
+  <!-- RIGHT PANEL: Info + extra controls -->
+  <div class="panel">
+    <div class="panel-title">// INFO</div>
+
+    <div class="section">
+      <div class="section-label">MATRIX SPEC</div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);line-height:2;">
+        <div>WIDTH  <span style="color:var(--text)">8 px</span></div>
+        <div>HEIGHT <span style="color:var(--text)">24 px</span></div>
+        <div>TOTAL  <span style="color:var(--text)">192 LEDs × 2</span></div>
+        <div>LAYOUT <span style="color:var(--text)">SERPENTINE</span></div>
+        <div>TYPE   <span style="color:var(--text)">WS2812B · 5050 SMD · GRB</span></div>
+        <div>LEFT   <span style="color:var(--text)">PIN 5</span></div>
+        <div>RIGHT  <span style="color:var(--text)">PIN 18</span></div>
+        <div>PAIR   <span style="color:var(--text)" id="spec-pair">mirror</span></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">BRUSH SIZE</div>
+      <div class="slider-row">
+        <span class="slider-label">SIZE</span>
+        <input type="range" id="brush-size" min="1" max="4" value="1" oninput="document.getElementById('brush-val').textContent=this.value">
+        <span class="slider-val" id="brush-val">1</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">QUICK PALETTE</div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:8px;">Saved colors</div>
+      <div class="color-swatch-grid" id="saved-palette" style="gap:5px;"></div>
+      <button class="tool-btn" style="width:100%;margin-top:6px;justify-content:center;" onclick="saveColor()">+ SAVE CURRENT</button>
+    </div>
+
+    <div class="section">
+      <div class="section-label">ACTIONS</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <button class="tool-btn" style="width:100%;justify-content:center;" onclick="invertCanvas()">⇄ INVERT</button>
+        <button class="tool-btn" style="width:100%;justify-content:center;" onclick="mirrorHCanvas()">↔ MIRROR H</button>
+        <button class="tool-btn" style="width:100%;justify-content:center;" onclick="shiftUp()">↑ SHIFT UP</button>
+        <button class="tool-btn" style="width:100%;justify-content:center;" onclick="shiftDown()">↓ SHIFT DOWN</button>
+        <button class="tool-btn" style="width:100%;justify-content:center;" onclick="randomize()">⚡ RANDOM</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">AUTO-PUSH</div>
+      <div class="slider-row" style="margin-bottom:6px;">
+        <label style="font-family:var(--mono);font-size:10px;color:var(--muted);display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input type="checkbox" id="auto-push" onchange="onAutoPush(this)"> LIVE MODE
+        </label>
+      </div>
+      <div style="font-family:var(--mono);font-size:9px;color:var(--dim);line-height:1.6;">
+        Sends every stroke to<br>the matrix in real time
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Constants ─────────────────────────────────────────────────────────────────
+const W = 8, H = 24;
+const SCALE = 28; // px per cell in canvas
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let pixels = new Array(W * H).fill('#000000');
+let pixelsLeft = new Array(W * H).fill('#000000');
+let pixelsRight = new Array(W * H).fill('#000000');
+let mirrorPair = true;
+let ws = null;
+let connected = false;
+let currentTool = 'pencil';
+let currentMode = 'draw';
+let drawColor = '#00e5ff';
+let isDrawing = false;
+let paintedCount = 0;
+let autoPush = false;
+let savedColors = ['#00e5ff','#ff3c6e','#b8ff3c','#ff9900','#cc44ff','#ffffff'];
+
+// ── Canvas setup ──────────────────────────────────────────────────────────────
+const canvas = document.getElementById('matrix-canvas');
+const ctx = canvas.getContext('2d');
+const canvasLeft = document.getElementById('matrix-canvas-left');
+const ctxLeft = canvasLeft.getContext('2d');
+const canvasRight = document.getElementById('matrix-canvas-right');
+const ctxRight = canvasRight.getContext('2d');
+
+function sizeCanvas(cv) {
+  cv.width  = W * SCALE;
+  cv.height = H * SCALE;
+  cv.style.width  = (W * SCALE) + 'px';
+  cv.style.height = (H * SCALE) + 'px';
+}
+sizeCanvas(canvas);
+sizeCanvas(canvasLeft);
+sizeCanvas(canvasRight);
+
+let showGrid = true;
+
+function renderOne(context, pxArr) {
+  const cv = context.canvas;
+  context.clearRect(0, 0, cv.width, cv.height);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const c = pxArr[y * W + x];
+      context.fillStyle = c;
+      context.fillRect(x * SCALE, y * SCALE, SCALE, SCALE);
+      if (showGrid) {
+        context.strokeStyle = 'rgba(42,42,56,0.7)';
+        context.lineWidth = 0.5;
+        context.strokeRect(x * SCALE + 0.25, y * SCALE + 0.25, SCALE - 0.5, SCALE - 0.5);
+      }
+    }
+  }
+}
+
+function renderCanvas() {
+  if (mirrorPair) {
+    renderOne(ctx, pixels);
+  } else {
+    renderOne(ctxLeft, pixelsLeft);
+    renderOne(ctxRight, pixelsRight);
+  }
+}
+
+// ── Palette setup ──────────────────────────────────────────────────────────────
+const PRESET_COLORS = [
+  '#ff0000','#ff4400','#ff8800','#ffcc00','#ffff00',
+  '#88ff00','#00ff00','#00ff88','#00ffff','#0088ff',
+  '#0000ff','#8800ff','#ff00ff','#ff0088','#ffffff',
+  '#aaaaaa','#555555','#000000','#00e5ff','#ff3c6e'
+];
+
+function buildPalette() {
+  const el = document.getElementById('palette');
+  PRESET_COLORS.forEach(c => {
+    const s = document.createElement('div');
+    s.className = 'swatch';
+    s.style.background = c;
+    s.title = c;
+    s.onclick = () => setDrawColor(c);
+    el.appendChild(s);
+  });
+  buildSavedPalette();
+}
+
+function buildSavedPalette() {
+  const el = document.getElementById('saved-palette');
+  el.innerHTML = '';
+  savedColors.forEach(c => {
+    const s = document.createElement('div');
+    s.className = 'swatch';
+    s.style.background = c;
+    s.title = c;
+    s.onclick = () => setDrawColor(c);
+    el.appendChild(s);
+  });
+}
+
+function saveColor() {
+  if (!savedColors.includes(drawColor)) {
+    savedColors.unshift(drawColor);
+    if (savedColors.length > 16) savedColors.pop();
+    buildSavedPalette();
+  }
+}
+
+function setDrawColor(c) {
+  drawColor = c;
+  document.getElementById('draw-color').value = c;
+  document.getElementById('draw-color-hex').textContent = c.toUpperCase();
+}
+
+function onDrawColorChange(c) {
+  drawColor = c;
+  document.getElementById('draw-color-hex').textContent = c.toUpperCase();
+}
+
+// ── Pointer events ─────────────────────────────────────────────────────────────
+function getCellFromCanvas(cv, e) {
+  const r = cv.getBoundingClientRect();
+  const px = (e.clientX - r.left) / r.width * cv.width;
+  const py = (e.clientY - r.top) / r.height * cv.height;
+  return { x: Math.floor(px / SCALE), y: Math.floor(py / SCALE) };
+}
+
+function pixelArrayForSide(side) {
+  if (mirrorPair) return pixels;
+  return side === 'left' ? pixelsLeft : pixelsRight;
+}
+
+function applyTool(side, x, y) {
+  if (x < 0 || x >= W || y < 0 || y >= H) return;
+  const px = pixelArrayForSide(side);
+  const bs = parseInt(document.getElementById('brush-size').value, 10);
+  const half = Math.floor(bs / 2);
+
+  if (currentTool === 'eyedrop') {
+    setDrawColor(px[y * W + x]);
+    return;
+  }
+
+  for (let dy = -half; dy < bs - half; dy++) {
+    for (let dx = -half; dx < bs - half; dx++) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
+      if (currentTool === 'pencil')  px[ny * W + nx] = drawColor;
+      if (currentTool === 'eraser')  px[ny * W + nx] = '#000000';
+    }
+  }
+  if (currentTool === 'fill') bucketFill(px, x, y, drawColor);
+}
+
+function bindCanvasPointer(cv, side) {
+  cv.addEventListener('mousedown', e => {
+    isDrawing = true;
+    const { x, y } = getCellFromCanvas(cv, e);
+    applyTool(side, x, y);
+    updatePaintCount();
+    renderCanvas();
+    if (autoPush) sendDraw();
+  });
+  cv.addEventListener('mousemove', e => {
+    const { x, y } = getCellFromCanvas(cv, e);
+    document.getElementById('cursor-pos').textContent =
+      (side === 'right' ? 'R ' : side === 'left' ? 'L ' : '') + `X:${x} Y:${y}`;
+    if (!isDrawing) return;
+    applyTool(side, x, y);
+    updatePaintCount();
+    renderCanvas();
+    if (autoPush) sendDraw();
+  });
+  cv.addEventListener('mouseup', () => { isDrawing = false; });
+  cv.addEventListener('mouseleave', () => { isDrawing = false; });
+  cv.addEventListener('touchstart', e => {
+    e.preventDefault();
+    isDrawing = true;
+    const t = e.touches[0];
+    const { x, y } = getCellFromCanvas(cv, t);
+    applyTool(side, x, y);
+    renderCanvas();
+    if (autoPush) sendDraw();
+  }, { passive: false });
+  cv.addEventListener('touchmove', e => {
+    e.preventDefault();
+    const t = e.touches[0];
+    const { x, y } = getCellFromCanvas(cv, t);
+    applyTool(side, x, y);
+    renderCanvas();
+    if (autoPush) sendDraw();
+  }, { passive: false });
+  cv.addEventListener('touchend', () => { isDrawing = false; });
+}
+
+bindCanvasPointer(canvas, 'mirror');
+bindCanvasPointer(canvasLeft, 'left');
+bindCanvasPointer(canvasRight, 'right');
+
+// ── Bucket fill ────────────────────────────────────────────────────────────────
+function bucketFill(px, sx, sy, newColor) {
+  const target = px[sy * W + sx];
+  if (target === newColor) return;
+  const stack = [[sx, sy]];
+  while (stack.length) {
+    const [x, y] = stack.pop();
+    if (x < 0 || x >= W || y < 0 || y >= H) continue;
+    if (px[y * W + x] !== target) continue;
+    px[y * W + x] = newColor;
+    stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+  }
+}
+
+function updatePaintCount() {
+  if (mirrorPair) {
+    paintedCount = pixels.filter(p => p !== '#000000').length;
+  } else {
+    paintedCount =
+      pixelsLeft.filter(p => p !== '#000000').length +
+      pixelsRight.filter(p => p !== '#000000').length;
+  }
+  document.getElementById('pixel-count').textContent = `${paintedCount} px painted`;
+}
+
+function setPairMode(mirror) {
+  if (mirror === mirrorPair) return;
+  resetUploadAnimationUi();
+  if (mirror) {
+    pixels = [...pixelsLeft];
+    mirrorPair = true;
+    document.getElementById('wrap-single').style.display = '';
+    document.getElementById('wrap-dual').style.display = 'none';
+    document.getElementById('pair-mirror').classList.add('active');
+    document.getElementById('pair-ind').classList.remove('active');
+  } else {
+    pixelsLeft = [...pixels];
+    pixelsRight = [...pixels];
+    mirrorPair = false;
+    document.getElementById('wrap-single').style.display = 'none';
+    document.getElementById('wrap-dual').style.display = 'flex';
+    document.getElementById('pair-mirror').classList.remove('active');
+    document.getElementById('pair-ind').classList.add('active');
+  }
+  const el = document.getElementById('spec-pair');
+  if (el) el.textContent = mirror ? 'mirror' : 'independent';
+  if (connected) {
+    ws.send(JSON.stringify({ cmd: 'pair', mode: mirror ? 'mirror' : 'independent' }));
+  }
+  renderCanvas();
+  updatePaintCount();
+}
+
+// ── Tools / modes ─────────────────────────────────────────────────────────────
+function setTool(t) {
+  currentTool = t;
+  ['pencil','fill-bucket','eraser','eyedrop'].forEach(id => {
+    document.getElementById('tool-' + id)?.classList.toggle('active', id === t || (id === 'fill-bucket' && t === 'fill'));
+  });
+}
+
+function setMode(m) {
+  if (currentMode === 'image' && m !== 'image') stopAnimationStream();
+  currentMode = m;
+  ['draw','animate','image','fill','off'].forEach(id => {
+    document.getElementById('mode-' + id)?.classList.toggle('active', id === m);
+  });
+  document.getElementById('section-anim').style.display  = m === 'animate' ? '' : 'none';
+  document.getElementById('section-image').style.display = m === 'image'   ? '' : 'none';
+  document.getElementById('section-fill').style.display  = m === 'fill'    ? '' : 'none';
+  if (m === 'animate') sendJson({ cmd: 'mode', mode: 'animation' });
+  if (m === 'draw')    sendJson({ cmd: 'mode', mode: 'static' });
+}
+
+function setAnim(i) {
+  [0,1,2,3].forEach(n => document.getElementById('anim-'+n)?.classList.toggle('active', n === i));
+  sendJson({ cmd: 'anim', type: i });
+  sendJson({ cmd: 'mode', mode: 'animation' });
+}
+
+function sendOff() {
+  stopAnimationStream();
+  currentMode = 'off';
+  ['draw','animate','image','fill','off'].forEach(id => {
+    document.getElementById('mode-' + id)?.classList.toggle('active', id === 'off');
+  });
+  sendJson({ cmd: 'mode', mode: 'off' });
+}
+
+// ── Canvas actions ─────────────────────────────────────────────────────────────
+function clearCanvas() {
+  if (mirrorPair) pixels.fill('#000000');
+  else {
+    pixelsLeft.fill('#000000');
+    pixelsRight.fill('#000000');
+  }
+  updatePaintCount();
+  renderCanvas();
+}
+
+function invertArr(arr) {
+  return arr.map(c => {
+    const r = parseInt(c.slice(1, 3), 16), g = parseInt(c.slice(3, 5), 16), b = parseInt(c.slice(5, 7), 16);
+    return `#${(255 - r).toString(16).padStart(2, '0')}${(255 - g).toString(16).padStart(2, '0')}${(255 - b).toString(16).padStart(2, '0')}`;
+  });
+}
+
+function invertCanvas() {
+  if (mirrorPair) pixels = invertArr(pixels);
+  else {
+    pixelsLeft = invertArr(pixelsLeft);
+    pixelsRight = invertArr(pixelsRight);
+  }
+  renderCanvas();
+}
+
+function mirrorHOne(arr) {
+  const np = [...arr];
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++)
+      np[y * W + (W - 1 - x)] = arr[y * W + x];
+  return np;
+}
+
+function mirrorHCanvas() {
+  if (mirrorPair) pixels = mirrorHOne(pixels);
+  else {
+    pixelsLeft = mirrorHOne(pixelsLeft);
+    pixelsRight = mirrorHOne(pixelsRight);
+  }
+  renderCanvas();
+}
+
+function shiftUp() {
+  if (mirrorPair) {
+    pixels = [...pixels.slice(W), ...pixels.slice(0, W)];
+  } else {
+    pixelsLeft = [...pixelsLeft.slice(W), ...pixelsLeft.slice(0, W)];
+    pixelsRight = [...pixelsRight.slice(W), ...pixelsRight.slice(0, W)];
+  }
+  renderCanvas();
+}
+
+function shiftDown() {
+  if (mirrorPair) {
+    pixels = [...pixels.slice(-W), ...pixels.slice(0, -W)];
+  } else {
+    pixelsLeft = [...pixelsLeft.slice(-W), ...pixelsLeft.slice(0, -W)];
+    pixelsRight = [...pixelsRight.slice(-W), ...pixelsRight.slice(0, -W)];
+  }
+  renderCanvas();
+}
+
+function randomize() {
+  const colors = ['#ff0000', '#00ff00', '#0000ff', '#ff8800', '#00ffff', '#ff00ff', '#ffffff', '#ffff00'];
+  const rnd = () => (Math.random() < 0.3 ? colors[Math.floor(Math.random() * colors.length)] : '#000000');
+  if (mirrorPair) pixels = pixels.map(() => rnd());
+  else {
+    pixelsLeft = pixelsLeft.map(() => rnd());
+    pixelsRight = pixelsRight.map(() => rnd());
+  }
+  renderCanvas();
+  updatePaintCount();
+}
+
+// ── Brightness (header slider; no error spam when offline) ───────────────────
+function onBrightness(el) {
+  document.getElementById('brightness-val').textContent = el.value;
+  if (connected) {
+    ws.send(JSON.stringify({ cmd: 'brightness', value: parseInt(el.value, 10) }));
+  }
+}
+
+// ── Fill ──────────────────────────────────────────────────────────────────────
+function fillPreview() {
+  const c = document.getElementById('fill-color').value;
+  if (mirrorPair) pixels.fill(c);
+  else {
+    pixelsLeft.fill(c);
+    pixelsRight.fill(c);
+  }
+  renderCanvas();
+}
+
+function sendFill() {
+  const c = document.getElementById('fill-color').value;
+  const r = parseInt(c.slice(1, 3), 16), g = parseInt(c.slice(3, 5), 16), b = parseInt(c.slice(5, 7), 16);
+  sendJson({ cmd: 'fill', r, g, b });
+  if (mirrorPair) pixels.fill(c);
+  else {
+    pixelsLeft.fill(c);
+    pixelsRight.fill(c);
+  }
+  renderCanvas();
+  log('Filled with ' + c, 'ok');
+}
+
+// ── Image upload & animations ───────────────────────────────────────────────────
+let uploadPixels = null;
+/** @type {'none'|'static'|'gif'|'video'} */
+let uploadKind = 'none';
+let animationFrames = [];
+let animationDelays = [];
+let animationVideo = null;
+let animationVideoUrl = null;
+let streamTimer = null;
+let streamRaf = null;
+let streamActive = false;
+let gifPatchCanvas = null;
+let gifPatchCtx = null;
+let gifPatchImageData = null;
+let gifFullCanvas = null;
+let gifFullCtx = null;
+const MAX_GIF_FRAMES = 360;
+
+function rgbToHex(r, g, b) {
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
+function revokeAnimationVideo() {
+  if (animationVideo) {
+    animationVideo.pause();
+    animationVideo.removeAttribute('src');
+    animationVideo.load();
+    animationVideo = null;
+  }
+  if (animationVideoUrl) {
+    URL.revokeObjectURL(animationVideoUrl);
+    animationVideoUrl = null;
+  }
+}
+
+function resetUploadAnimationUi() {
+  stopAnimationStream();
+  uploadPixels = null;
+  animationFrames = [];
+  animationDelays = [];
+  revokeAnimationVideo();
+  uploadKind = 'none';
+  const prev = document.getElementById('upload-preview');
+  if (prev) prev.style.display = 'none';
+  const st = document.getElementById('anim-status');
+  const ctr = document.getElementById('anim-controls');
+  if (st) st.style.display = 'none';
+  if (ctr) ctr.style.display = 'none';
+  const playBtn = document.getElementById('play-anim-btn');
+  const stopBtn = document.getElementById('stop-anim-btn');
+  if (playBtn) playBtn.disabled = true;
+  if (stopBtn) stopBtn.style.display = 'none';
+  const sendBtn = document.getElementById('send-image-btn');
+  if (sendBtn) sendBtn.disabled = true;
+}
+
+function imageDataToLedBuffer(data, width, height) {
+  if (mirrorPair) {
+    const buf = new Uint8Array(W * H * 3);
+    const px = [];
+    for (let i = 0; i < W * H; i++) {
+      buf[i * 3]     = data[i * 4];
+      buf[i * 3 + 1] = data[i * 4 + 1];
+      buf[i * 3 + 2] = data[i * 4 + 2];
+      px.push(rgbToHex(data[i * 4], data[i * 4 + 1], data[i * 4 + 2]));
+    }
+    return { buf, pixels: px };
+  }
+  const buf = new Uint8Array(W * H * 3 * 2);
+  const left = [];
+  const right = [];
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const oL = (y * width + x) * 4;
+      const j = y * W + x;
+      buf[j * 3]     = data[oL];
+      buf[j * 3 + 1] = data[oL + 1];
+      buf[j * 3 + 2] = data[oL + 2];
+      left.push(rgbToHex(data[oL], data[oL + 1], data[oL + 2]));
+    }
+  }
+  const off = W * H * 3;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const oR = (y * width + (x + W)) * 4;
+      const j = y * W + x;
+      buf[off + j * 3]     = data[oR];
+      buf[off + j * 3 + 1] = data[oR + 1];
+      buf[off + j * 3 + 2] = data[oR + 2];
+      right.push(rgbToHex(data[oR], data[oR + 1], data[oR + 2]));
+    }
+  }
+  return { buf, pixelsLeft: left, pixelsRight: right };
+}
+
+/** Update draw `pixels` / `pixelsLeft`+`pixelsRight` from a raw RGB buffer */
+function bufferToDrawPixels(buf) {
+  if (mirrorPair) {
+    const px = [];
+    for (let i = 0; i < W * H; i++)
+      px.push(rgbToHex(buf[i * 3], buf[i * 3 + 1], buf[i * 3 + 2]));
+    return { pixels: px };
+  }
+  const left = [];
+  const right = [];
+  const off = W * H * 3;
+  for (let i = 0; i < W * H; i++)
+    left.push(rgbToHex(buf[i * 3], buf[i * 3 + 1], buf[i * 3 + 2]));
+  for (let i = 0; i < W * H; i++)
+    right.push(rgbToHex(buf[off + i * 3], buf[off + i * 3 + 1], buf[off + i * 3 + 2]));
+  return { pixelsLeft: left, pixelsRight: right };
+}
+
+function drawGifPatch(frame) {
+  const dims = frame.dims;
+  if (!gifPatchImageData ||
+      dims.width !== gifPatchImageData.width ||
+      dims.height !== gifPatchImageData.height) {
+    if (!gifPatchCanvas) {
+      gifPatchCanvas = document.createElement('canvas');
+      gifPatchCtx = gifPatchCanvas.getContext('2d');
+    }
+    gifPatchCanvas.width = dims.width;
+    gifPatchCanvas.height = dims.height;
+    gifPatchImageData = gifPatchCtx.createImageData(dims.width, dims.height);
+  }
+  gifPatchImageData.data.set(frame.patch);
+  gifPatchCtx.putImageData(gifPatchImageData, 0, 0);
+  gifFullCtx.drawImage(gifPatchCanvas, dims.left, dims.top);
+}
+
+function rasterGifToLedFrames(buffer) {
+  return (async () => {
+    const { parseGIF, decompressFrames } = await import('https://esm.sh/gifuct-js@2.1.2');
+    const gif = parseGIF(buffer);
+    const frames = decompressFrames(gif, true);
+    if (!frames.length) throw new Error('No frames in GIF');
+    if (frames.length > MAX_GIF_FRAMES) {
+      log(`GIF has ${frames.length} frames — using first ${MAX_GIF_FRAMES}`, 'info');
+    }
+    const useFrames = frames.slice(0, MAX_GIF_FRAMES);
+    const gw = gif.lsd.width;
+    const gh = gif.lsd.height;
+    if (!gifFullCanvas) {
+      gifFullCanvas = document.createElement('canvas');
+      gifFullCtx = gifFullCanvas.getContext('2d');
+    }
+    gifFullCanvas.width = gw;
+    gifFullCanvas.height = gh;
+
+    const outFrames = [];
+    const delays = [];
+    let needsDisposal = false;
+    const sw = mirrorPair ? W : W * 2;
+    const scaleCanvas = document.createElement('canvas');
+    scaleCanvas.width = sw;
+    scaleCanvas.height = H;
+    const sctx = scaleCanvas.getContext('2d');
+    sctx.imageSmoothingEnabled = false;
+
+    for (let i = 0; i < useFrames.length; i++) {
+      const frame = useFrames[i];
+      if (needsDisposal) {
+        gifFullCtx.clearRect(0, 0, gw, gh);
+        needsDisposal = false;
+      }
+      drawGifPatch(frame);
+      sctx.drawImage(gifFullCanvas, 0, 0, sw, H);
+      const data = sctx.getImageData(0, 0, sw, H).data;
+      const { buf } = imageDataToLedBuffer(data, sw, H);
+      outFrames.push(buf);
+      let d = frame.delay != null ? frame.delay : 100;
+      if (d < 20) d = 100;
+      delays.push(d);
+      if (frame.disposalType === 2) needsDisposal = true;
+    }
+    return { outFrames, delays, gw, gh, count: useFrames.length };
+  })();
+}
+
+function previewBufferToCanvas(buf) {
+  const prev = document.getElementById('upload-preview');
+  const pctx = prev.getContext('2d');
+  if (mirrorPair) {
+    prev.width = W;
+    prev.height = H;
+    const imgData = pctx.createImageData(W, H);
+    for (let i = 0; i < W * H; i++) {
+      imgData.data[i * 4]     = buf[i * 3];
+      imgData.data[i * 4 + 1] = buf[i * 3 + 1];
+      imgData.data[i * 4 + 2] = buf[i * 3 + 2];
+      imgData.data[i * 4 + 3] = 255;
+    }
+    pctx.putImageData(imgData, 0, 0);
+  } else {
+    prev.width = W * 2;
+    prev.height = H;
+    const imgData = pctx.createImageData(W * 2, H);
+    const half = W * H * 3;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x;
+        const oL = (y * (W * 2) + x) * 4;
+        imgData.data[oL]     = buf[i * 3];
+        imgData.data[oL + 1] = buf[i * 3 + 1];
+        imgData.data[oL + 2] = buf[i * 3 + 2];
+        imgData.data[oL + 3] = 255;
+        const oR = (y * (W * 2) + (x + W)) * 4;
+        imgData.data[oR]     = buf[half + i * 3];
+        imgData.data[oR + 1] = buf[half + i * 3 + 1];
+        imgData.data[oR + 2] = buf[half + i * 3 + 2];
+        imgData.data[oR + 3] = 255;
+      }
+    }
+    pctx.putImageData(imgData, 0, 0);
+  }
+  prev.style.display = 'block';
+  prev.style.imageRendering = 'pixelated';
+  prev.style.width = '100%';
+}
+
+function handleImageUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  resetUploadAnimationUi();
+
+  const isVid = file.type.startsWith('video/');
+  const isGif = file.type === 'image/gif' || /\.gif$/i.test(file.name);
+
+  if (isVid) {
+    animationVideoUrl = URL.createObjectURL(file);
+    animationVideo = document.createElement('video');
+    animationVideo.muted = true;
+    animationVideo.loop = true;
+    animationVideo.playsInline = true;
+    animationVideo.setAttribute('playsinline', '');
+    animationVideo.src = animationVideoUrl;
+    animationVideo.addEventListener('loadeddata', () => {
+      if (!animationVideo) return;
+      uploadKind = 'video';
+      const v = animationVideo;
+      const sw = mirrorPair ? W : W * 2;
+      const scaleCanvas = document.createElement('canvas');
+      scaleCanvas.width = sw;
+      scaleCanvas.height = H;
+      const sctx = scaleCanvas.getContext('2d');
+      sctx.imageSmoothingEnabled = false;
+      v.currentTime = 0;
+      v.pause();
+      const drawPreview = () => {
+        sctx.drawImage(v, 0, 0, sw, H);
+        const data = sctx.getImageData(0, 0, sw, H).data;
+        const parsed = imageDataToLedBuffer(data, sw, H);
+        uploadPixels = parsed.buf;
+        if (mirrorPair) pixels = parsed.pixels;
+        else {
+          pixelsLeft = parsed.pixelsLeft;
+          pixelsRight = parsed.pixelsRight;
+        }
+        previewBufferToCanvas(uploadPixels);
+      };
+      drawPreview();
+      document.getElementById('anim-status').textContent =
+        `Video · ${Math.round(v.videoWidth)}×${Math.round(v.videoHeight)} → ${sw}×${H} (stream)`;
+      document.getElementById('anim-status').style.display = 'block';
+      document.getElementById('anim-controls').style.display = 'block';
+      document.getElementById('play-anim-btn').disabled = false;
+      document.getElementById('send-image-btn').disabled = false;
+      renderCanvas();
+      log(`Video loaded — use STREAM for playback`, 'info');
+    }, { once: true });
+    animationVideo.addEventListener('error', () => {
+      log('Could not decode video in this browser', 'err');
+      resetUploadAnimationUi();
+    });
+    return;
+  }
+
+  if (isGif) {
+    file.arrayBuffer().then(async (buffer) => {
+      try {
+        const { outFrames, delays, gw, gh, count } = await rasterGifToLedFrames(buffer);
+        animationFrames = outFrames;
+        animationDelays = delays;
+        uploadKind = 'gif';
+        uploadPixels = outFrames[0];
+        const p = bufferToDrawPixels(outFrames[0]);
+        if (mirrorPair) pixels = p.pixels;
+        else {
+          pixelsLeft = p.pixelsLeft;
+          pixelsRight = p.pixelsRight;
+        }
+        previewBufferToCanvas(outFrames[0]);
+        document.getElementById('anim-status').textContent =
+          `GIF · ${gw}×${gh} · ${count} frame(s)`;
+        document.getElementById('anim-status').style.display = 'block';
+        document.getElementById('anim-controls').style.display = 'block';
+        document.getElementById('play-anim-btn').disabled = false;
+        document.getElementById('send-image-btn').disabled = false;
+        renderCanvas();
+        log(`GIF decoded: ${count} frames`, 'ok');
+      } catch (err) {
+        log('GIF decode failed: ' + (err && err.message ? err.message : err), 'err');
+        resetUploadAnimationUi();
+      }
+    });
+    return;
+  }
+
+  const img = new Image();
+  img.onload = () => {
+    uploadKind = 'static';
+    const prev = document.getElementById('upload-preview');
+    const pctx = prev.getContext('2d');
+    if (mirrorPair) {
+      prev.width = W;
+      prev.height = H;
+      pctx.drawImage(img, 0, 0, W, H);
+      const data = pctx.getImageData(0, 0, W, H).data;
+      uploadPixels = new Uint8Array(W * H * 3);
+      pixels = [];
+      for (let i = 0; i < W * H; i++) {
+        uploadPixels[i * 3]     = data[i * 4];
+        uploadPixels[i * 3 + 1] = data[i * 4 + 1];
+        uploadPixels[i * 3 + 2] = data[i * 4 + 2];
+        pixels.push(rgbToHex(data[i * 4], data[i * 4 + 1], data[i * 4 + 2]));
+      }
+      log(`Image loaded: ${img.naturalWidth}×${img.naturalHeight} → 8×24`, 'info');
+    } else {
+      prev.width = W * 2;
+      prev.height = H;
+      pctx.drawImage(img, 0, 0, W * 2, H);
+      const data = pctx.getImageData(0, 0, W * 2, H).data;
+      uploadPixels = new Uint8Array(W * H * 3 * 2);
+      pixelsLeft = [];
+      pixelsRight = [];
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          const oL = (y * (W * 2) + x) * 4;
+          const j = y * W + x;
+          uploadPixels[j * 3]     = data[oL];
+          uploadPixels[j * 3 + 1] = data[oL + 1];
+          uploadPixels[j * 3 + 2] = data[oL + 2];
+          pixelsLeft.push(rgbToHex(data[oL], data[oL + 1], data[oL + 2]));
+        }
+      }
+      const off = W * H * 3;
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          const oR = (y * (W * 2) + (x + W)) * 4;
+          const j = y * W + x;
+          uploadPixels[off + j * 3]     = data[oR];
+          uploadPixels[off + j * 3 + 1] = data[oR + 1];
+          uploadPixels[off + j * 3 + 2] = data[oR + 2];
+          pixelsRight.push(rgbToHex(data[oR], data[oR + 1], data[oR + 2]));
+        }
+      }
+      log(`Image loaded: ${img.naturalWidth}×${img.naturalHeight} → 16×24 (split L/R)`, 'info');
+    }
+    prev.style.display = 'block';
+    prev.style.imageRendering = 'pixelated';
+    prev.style.width = '100%';
+    renderCanvas();
+    document.getElementById('send-image-btn').disabled = false;
+  };
+  img.src = URL.createObjectURL(file);
+}
+
+function sendImage() {
+  if (!uploadPixels) return;
+  sendBinary(uploadPixels);
+  log(uploadKind === 'gif' || uploadKind === 'video' ? 'Current frame sent' : 'Image sent to matrix', 'ok');
+}
+
+function playAnimationStream() {
+  if (!connected) {
+    log('Not connected', 'err');
+    return;
+  }
+  stopAnimationStream();
+  streamActive = true;
+  const fpsCap = Math.max(1, parseInt(document.getElementById('anim-fps').value, 10) || 20);
+  const minMs = 1000 / fpsCap;
+  const loop = document.getElementById('anim-loop').checked;
+  document.getElementById('play-anim-btn').disabled = true;
+  document.getElementById('stop-anim-btn').style.display = 'block';
+  sendJson({ cmd: 'mode', mode: 'static' });
+
+  if (uploadKind === 'gif' && animationFrames.length) {
+    let idx = 0;
+    const tick = () => {
+      if (!streamActive) return;
+      const buf = animationFrames[idx];
+      const delay = animationDelays[idx] != null ? animationDelays[idx] : 100;
+      const wait = Math.max(minMs, delay);
+      sendBinary(buf);
+      previewBufferToCanvas(buf);
+      const p = bufferToDrawPixels(buf);
+      if (mirrorPair) pixels = p.pixels;
+      else {
+        pixelsLeft = p.pixelsLeft;
+        pixelsRight = p.pixelsRight;
+      }
+      renderCanvas();
+      idx++;
+      if (idx >= animationFrames.length) {
+        if (!loop) {
+          stopAnimationStream();
+          return;
+        }
+        idx = 0;
+      }
+      streamTimer = setTimeout(tick, wait);
+    };
+    tick();
+    log('GIF stream started', 'ok');
+    return;
+  }
+
+  if (uploadKind === 'video' && animationVideo) {
+    const v = animationVideo;
+    const sw = mirrorPair ? W : W * 2;
+    const scaleCanvas = document.createElement('canvas');
+    scaleCanvas.width = sw;
+    scaleCanvas.height = H;
+    const sctx = scaleCanvas.getContext('2d');
+    sctx.imageSmoothingEnabled = false;
+    v.loop = loop;
+    const tick = () => {
+      if (!streamActive || !animationVideo) return;
+      sctx.drawImage(v, 0, 0, sw, H);
+      const data = sctx.getImageData(0, 0, sw, H).data;
+      const parsed = imageDataToLedBuffer(data, sw, H);
+      uploadPixels = parsed.buf;
+      sendBinary(parsed.buf);
+      if (mirrorPair) pixels = parsed.pixels;
+      else {
+        pixelsLeft = parsed.pixelsLeft;
+        pixelsRight = parsed.pixelsRight;
+      }
+      previewBufferToCanvas(parsed.buf);
+      renderCanvas();
+    };
+    v.play().catch(() => log('Video play blocked — click page first', 'err'));
+    streamTimer = setInterval(tick, minMs);
+    tick();
+    log('Video stream started', 'ok');
+    return;
+  }
+
+  streamActive = false;
+  document.getElementById('play-anim-btn').disabled = true;
+  document.getElementById('stop-anim-btn').style.display = 'none';
+  log('Nothing to stream — load a GIF or video first', 'err');
+}
+
+function stopAnimationStream() {
+  streamActive = false;
+  if (streamTimer != null) {
+    clearTimeout(streamTimer);
+    clearInterval(streamTimer);
+    streamTimer = null;
+  }
+  if (streamRaf != null) {
+    cancelAnimationFrame(streamRaf);
+    streamRaf = null;
+  }
+  if (animationVideo) animationVideo.pause();
+  const canStream =
+    (uploadKind === 'gif' && animationFrames.length > 0) || uploadKind === 'video';
+  const playBtn = document.getElementById('play-anim-btn');
+  if (playBtn) playBtn.disabled = !canStream;
+  const stopBtn = document.getElementById('stop-anim-btn');
+  if (stopBtn) stopBtn.style.display = 'none';
+}
+
+// Parse #rgb / #rrggbb / #rrggbbaa → [r,g,b] (always radix 16; avoids parseInt quirks)
+function hexToRgbBytes(hex) {
+  let s = String(hex || '#000000').trim();
+  if (s[0] === '#') s = s.slice(1);
+  if (s.length === 3)
+    s = s.split('').map((ch) => ch + ch).join('');
+  else if (s.length >= 8) s = s.slice(0, 6); // #rrggbbaa from some color inputs
+  if (s.length !== 6) return [0, 0, 0];
+  const r = parseInt(s.slice(0, 2), 16);
+  const g = parseInt(s.slice(2, 4), 16);
+  const b = parseInt(s.slice(4, 6), 16);
+  return [
+    Number.isFinite(r) ? r : 0,
+    Number.isFinite(g) ? g : 0,
+    Number.isFinite(b) ? b : 0,
+  ];
+}
+
+function fillRgbBufferFromHex(pxArr, buf, byteOffset) {
+  let o = byteOffset || 0;
+  for (let i = 0; i < W * H; i++) {
+    const [r, g, b] = hexToRgbBytes(pxArr[i]);
+    buf[o++] = r;
+    buf[o++] = g;
+    buf[o++] = b;
+  }
+}
+
+// ── Draw: send as binary ──────────────────────────────────────────────────────
+function sendDraw() {
+  if (mirrorPair) {
+    const buf = new Uint8Array(W * H * 3);
+    fillRgbBufferFromHex(pixels, buf, 0);
+    sendBinary(buf);
+  } else {
+    const buf = new Uint8Array(W * H * 3 * 2);
+    fillRgbBufferFromHex(pixelsLeft, buf, 0);
+    fillRgbBufferFromHex(pixelsRight, buf, W * H * 3);
+    sendBinary(buf);
+  }
+}
+
+// ── Auto-push ─────────────────────────────────────────────────────────────────
+function onAutoPush(el) {
+  autoPush = el.checked;
+  log(autoPush ? 'Live mode ON' : 'Live mode OFF', 'info');
+}
+
+// ── WebSocket ─────────────────────────────────────────────────────────────────
+function toggleConnect() {
+  if (connected) { ws.close(); return; }
+  const url = document.getElementById('ws-url').value.trim();
+  try {
+    ws = new WebSocket(url);
+    ws.binaryType = 'arraybuffer';
+    ws.onopen    = () => {
+      connected = true;
+      setStatus('connected');
+      log('Connected to ' + url, 'ok');
+      document.getElementById('connect-btn').textContent = 'DISCONNECT';
+      const b = parseInt(document.getElementById('brightness').value, 10);
+      ws.send(JSON.stringify({ cmd: 'pair', mode: mirrorPair ? 'mirror' : 'independent' }));
+      ws.send(JSON.stringify({ cmd: 'brightness', value: b }));
+    };
+    ws.onclose   = () => {
+      connected = false;
+      stopAnimationStream();
+      setStatus('');
+      log('Disconnected', 'err');
+      document.getElementById('connect-btn').textContent = 'CONNECT';
+    };
+    ws.onerror   = () => { setStatus('error'); log('Connection error', 'err'); };
+    ws.onmessage = (e) => { log('← ' + e.data, 'info'); };
+  } catch(err) { log('Invalid URL: ' + err.message, 'err'); }
+}
+
+function sendJson(obj) {
+  if (!connected) { log('Not connected', 'err'); return; }
+  ws.send(JSON.stringify(obj));
+}
+
+function sendBinary(buf) {
+  if (!connected) { log('Not connected — push ignored', 'err'); return; }
+  // Send the Uint8Array view, not buf.buffer — the backing ArrayBuffer can be
+  // larger than W*H*3, which would corrupt the frame length on the ESP32.
+  ws.send(buf);
+}
+
+function setStatus(s) {
+  const led = document.getElementById('status-led');
+  const txt = document.getElementById('status-text');
+  led.className = 'status-led' + (s ? ' ' + s : '');
+  txt.textContent = s === 'connected' ? 'LIVE' : s === 'error' ? 'ERROR' : 'OFFLINE';
+}
+
+// ── Log ───────────────────────────────────────────────────────────────────────
+function log(msg, type = 'info') {
+  const el = document.getElementById('log');
+  const now = new Date();
+  const ts = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.innerHTML = `<span class="log-time">${ts}</span><span class="log-${type}">${msg}</span>`;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+  if (el.children.length > 50) el.removeChild(el.firstChild);
+}
+
+// ── Upload drag-over ──────────────────────────────────────────────────────────
+const zone = document.getElementById('upload-zone');
+zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('drag-over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) { document.getElementById('img-input').files = e.dataTransfer.files; handleImageUpload({ target: { files: [f] } }); }
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+buildPalette();
+renderCanvas();
+log('LED Matrix Controller ready', 'info');
+log('Connect to your ESP32 WebSocket to begin', 'info');
+</script>
+</body>
+</html>

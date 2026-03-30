@@ -1,0 +1,9 @@
+# Help clangd parse PlatformIO's compile_commands.json for ESP32 (Xtensa).
+# Host clang does not understand GCC's Xtensa-only flags; stripping them avoids
+# bogus "unknown argument" errors. Pair with --query-driver in .vscode/settings.json
+# so system headers (e.g. machine/endian.h) resolve like the real toolchain.
+CompileFlags:
+  Remove:
+    - -mlongcalls
+    - -fstrict-volatile-bitfields
+    - -fno-tree-switch-conversion
