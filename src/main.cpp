@@ -5,8 +5,7 @@
 #include <ArduinoJson.h>
 
 // ── WiFi credentials ─────────────────────────────────────────────────────────
-const char* WIFI_SSID = "cottagelab";
-const char* WIFI_PASS = "1229Cottage";
+#include "wifi-credentials.h"
 
 // ── Matrix config ─────────────────────────────────────────────────────────────
 #define LEFT_PIN  5
@@ -16,6 +15,9 @@ const char* WIFI_PASS = "1229Cottage";
 #define NUM_LEDS  (WIDTH * HEIGHT)
 // Global dimming uses 8-bit scale: low values crush pastels (only ~N distinct steps per channel).
 #define BRIGHTNESS 128
+
+static uint8_t throbHue = 0;
+static uint8_t throbPhase = 0;
 
 CRGB leftLeds[NUM_LEDS];
 CRGB rightLeds[NUM_LEDS];
@@ -123,7 +125,7 @@ void onWsEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length) {
 // ── Animation tick ────────────────────────────────────────────────────────────
 void tickAnimation() {
   unsigned long now = millis();
-  int interval = (animationType == 0) ? 15 : 100;
+  int interval = (animationType == 0) ? 15 : (animationType == 4) ? 20 : 100;
   if (now - lastFrame < (unsigned long)interval) return;
   lastFrame = now;
 
@@ -166,8 +168,62 @@ void tickAnimation() {
       }
     animStep = (animStep + 2) % 256;
     lastFrame = now - 70; // ~14fps
+  } else if (animationType == 4) { // throbber
+    const uint8_t cx = WIDTH / 2;
+    const uint8_t cy = HEIGHT / 2;
+    for (uint8_t y = 0; y < HEIGHT; y++) {
+      for (uint8_t x = 0; x < WIDTH; x++) {
+        float dx = (float)x - (float)cx + 0.5f;
+        float dy = (float)y - (float)cy + 0.5f;
+        uint8_t dist = (uint8_t)sqrtf(dx * dx + dy * dy);
+        uint8_t wave = dist * 16;
+        uint8_t diff = wave - (uint8_t)animStep;
+        uint8_t bri  = (diff < 128) ? (255 - diff) : 0;
+        CRGB c = CHSV(throbHue + dist * 12, 220, bri);
+        leftLeds[XY(x, y)] = c;
+        if (mirrorPair) rightLeds[XY_MIRROR(x, y)] = c;
+        else            rightLeds[XY(x, y)]         = c;
+      }
+    }
+    throbHue += 1;
+    animStep = (animStep + 6) % 256;
   }
   FastLED.show();
+}
+
+// ── Rainbow throbber ──────────────────────────────────────────────────────────
+void startupThrobber() {
+  const uint8_t cx = WIDTH / 2;   // 4  (between cols 3 and 4)
+  const uint8_t cy = HEIGHT / 2;  // 12 (between rows 11 and 12)
+  // Max Manhattan distance from centre to a corner
+  const uint8_t maxDist = cx + cy; // 4+12 = 16
+
+  for (uint8_t y = 0; y < HEIGHT; y++) {
+    for (uint8_t x = 0; x < WIDTH; x++) {
+      // Manhattan distance gives a diamond pulse; use float sqrt for circular
+      float dx = (float)x - (float)cx + 0.5f;
+      float dy = (float)y - (float)cy + 0.5f;
+      uint8_t dist = (uint8_t)sqrtf(dx * dx + dy * dy);
+
+      // Wave front: pixels near (dist - throbPhase/16) are bright
+      uint8_t wave = dist * 16;                  // scale dist into 8-bit space
+      uint8_t diff = wave - throbPhase;          // wraps naturally in uint8
+      // Brightness: full at wave front, falls off behind it
+      uint8_t bri = 255 - diff;                  // front=255, trailing edge=0
+      // Soft-clip: keep only the leading half of each pulse
+      bri = (diff < 128) ? bri : 0;
+
+      CRGB c = CHSV(throbHue + dist * 12, 220, bri);
+      leftLeds[XY(x, y)] = c;
+      rightLeds[XY_MIRROR(x, y)] = c;
+    }
+  }
+
+  throbPhase += 6;   // pulse speed — increase to speed up
+  throbHue  += 1;    // hue drift — increase for faster colour rotation
+
+  FastLED.show();
+  delay(20);         // ~50 fps cap
 }
 
 void setup() {
@@ -184,8 +240,15 @@ void setup() {
 
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   Serial.print("Connecting WiFi");
-  while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
+  while (WiFi.status() != WL_CONNECTED) {
+    startupThrobber();
+    Serial.print(".");
+  }
+
   Serial.println();
+  fillBoth(CRGB::Black);
+  FastLED.show();
+ 
   Serial.print("IP: "); Serial.println(WiFi.localIP());
 
   ws.begin();

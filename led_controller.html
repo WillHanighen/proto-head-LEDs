@@ -907,6 +907,7 @@
         <button class="anim-btn"        id="anim-1" onclick="setAnim(1)">ROW<br>SWEEP</button>
         <button class="anim-btn"        id="anim-2" onclick="setAnim(2)">COL<br>SWEEP</button>
         <button class="anim-btn"        id="anim-3" onclick="setAnim(3)">RAIN<br>BOW</button>
+        <button class="anim-btn" id="anim-4" onclick="setAnim(4)">THROB<br>BER</button>
       </div>
     </div>
 
@@ -1435,7 +1436,7 @@ function setMode(m) {
 }
 
 function setAnim(i) {
-  [0,1,2,3].forEach(n => document.getElementById('anim-'+n)?.classList.toggle('active', n === i));
+  [0,1,2,3,4].forEach(n => document.getElementById('anim-'+n)?.classList.toggle('active', n === i));
   sendJson({ cmd: 'anim', type: i });
   sendJson({ cmd: 'mode', mode: 'animation' });
 }
