@@ -3,31 +3,44 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LED MATRIX CTRL</title>
-<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<title>LED Matrix · Control Deck</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Oxanium:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg:       #0a0a0c;
-    --surface:  #111116;
-    --panel:    #16161e;
-    --border:   #2a2a38;
-    --accent:   #00e5ff;
-    --accent2:  #ff3c6e;
-    --accent3:  #b8ff3c;
-    --dim:      #3a3a50;
-    --text:     #c8c8e0;
-    --muted:    #5a5a78;
-    --mono:     'Share Tech Mono', monospace;
-    --sans:     'Barlow Condensed', sans-serif;
+    --bg-deep:     #0c0b09;
+    --bg:          #12100e;
+    --metal-top:   #3a3632;
+    --metal-mid:   #252220;
+    --metal-dark:  #151312;
+    --recess:      #080706;
+    --panel-face:  #1e1c19;
+    --border-out:  #4a4540;
+    --border-in:   #0a0908;
+    --accent:      #2ec4b6;
+    --accent-lit:  #5ee4d6;
+    --accent2:     #e8486a;
+    --accent3:     #7dd96f;
+    --amber:       #d4a012;
+    --amber-glow:  rgba(212, 160, 18, 0.35);
+    --dim:         #5c564e;
+    --text:        #e8e4dc;
+    --muted:       #8a8378;
+    --mono:        'JetBrains Mono', ui-monospace, monospace;
+    --sans:        'Oxanium', system-ui, sans-serif;
     --W: 8;
     --H: 24;
     --cell: 22px;
+    --bevel-light: rgba(255, 248, 240, 0.12);
+    --bevel-dark:  rgba(0, 0, 0, 0.45);
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
-    background: var(--bg);
+    background:
+      radial-gradient(ellipse 120% 80% at 50% -20%, rgba(46, 196, 182, 0.06), transparent 50%),
+      radial-gradient(ellipse 80% 50% at 100% 100%, rgba(212, 160, 18, 0.04), transparent 45%),
+      linear-gradient(165deg, var(--bg-deep) 0%, var(--bg) 40%, #0a0908 100%);
     color: var(--text);
     font-family: var(--sans);
     min-height: 100vh;
@@ -36,263 +49,809 @@
     overflow-x: hidden;
   }
 
-  /* scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9998;
+    opacity: 0.7;
+  }
+
   body::after {
     content: '';
-    position: fixed; inset: 0;
-    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px);
+    position: fixed;
+    inset: 0;
+    box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.5);
     pointer-events: none;
     z-index: 9999;
   }
 
-  /* ── Header ──────────────────────────────────────────── */
+  @keyframes pulse { 0%, 100% { opacity: 1; filter: brightness(1); } 50% { opacity: 0.45; filter: brightness(0.85); } }
+
+  /* ── Chassis header ──────────────────────────────────── */
   header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 24px;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface);
-    position: sticky; top: 0; z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+    padding: 14px 22px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background:
+      linear-gradient(180deg, var(--metal-top) 0%, var(--metal-mid) 18%, var(--metal-dark) 100%);
+    border-bottom: 1px solid var(--border-out);
+    box-shadow:
+      0 4px 16px var(--bevel-dark),
+      inset 0 1px 0 var(--bevel-light),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.35);
   }
+
   .logo {
     font-family: var(--mono);
-    font-size: 13px;
-    color: var(--accent);
-    letter-spacing: 0.15em;
-    display: flex; align-items: center; gap: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent-lit);
+    letter-spacing: 0.12em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.8);
   }
-  .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: pulse 2s ease-in-out infinite; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .logo-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #8ff 0%, var(--accent) 45%, #0a5c54 100%);
+    box-shadow:
+      0 0 10px rgba(46, 196, 182, 0.7),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.4);
+    animation: pulse 2.2s ease-in-out infinite;
+  }
 
   .status-bar {
-    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
   }
   .header-brightness {
-    display: flex; align-items: center; gap: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: linear-gradient(180deg, #1a1816, #0e0d0b);
+    border-radius: 6px;
+    border: 1px solid var(--border-in);
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.45), 0 1px 0 var(--bevel-light);
   }
   .header-brightness .hdr-bright-label {
-    font-size: 10px; letter-spacing: 0.12em; color: var(--muted);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+    font-weight: 600;
   }
   .header-brightness input[type="range"] {
-    width: 120px; -webkit-appearance: none; height: 2px;
-    background: var(--border); outline: none; cursor: pointer;
+    width: 128px;
+    -webkit-appearance: none;
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(180deg, #0a0908, #1a1816);
+    outline: none;
+    cursor: pointer;
+    border: 1px solid var(--border-in);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
   }
   .header-brightness input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 12px; height: 12px; border-radius: 0;
-    background: var(--accent); cursor: pointer; box-shadow: 0 0 6px var(--accent);
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: linear-gradient(145deg, #4a4845, #2a2825);
+    border: 1px solid #5a5650;
+    cursor: pointer;
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    margin-top: -5px;
   }
-  #brightness-val { min-width: 22px; text-align: right; color: var(--accent); }
+  .header-brightness input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: linear-gradient(145deg, #4a4845, #2a2825);
+    border: 1px solid #5a5650;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  }
+  #brightness-val {
+    min-width: 28px;
+    text-align: right;
+    color: var(--accent-lit);
+    font-weight: 600;
+  }
   .status-indicator {
-    display: flex; align-items: center; gap: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: linear-gradient(180deg, #1a1816, #0e0d0b);
+    border-radius: 6px;
+    border: 1px solid var(--border-in);
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
   }
   .status-led {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: var(--dim); transition: background 0.3s, box-shadow 0.3s;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #555, #222);
+    border: 1px solid #111;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6);
+    transition: background 0.3s, box-shadow 0.3s;
   }
-  .status-led.connected { background: var(--accent3); box-shadow: 0 0 6px var(--accent3); }
-  .status-led.error     { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); animation: pulse 0.8s infinite; }
+  .status-led.connected {
+    background: radial-gradient(circle at 35% 35%, #b8ff9a, var(--accent3) 55%, #1a4a12);
+    box-shadow: 0 0 12px rgba(125, 217, 111, 0.85), inset 0 -1px 2px rgba(0, 0, 0, 0.3);
+  }
+  .status-led.error {
+    background: radial-gradient(circle at 35% 35%, #ff8a9a, var(--accent2) 55%, #4a0a12);
+    box-shadow: 0 0 12px rgba(232, 72, 106, 0.75);
+    animation: pulse 0.85s infinite;
+  }
 
-  #ws-url-form { display: flex; gap: 6px; align-items: center; }
-  #ws-url { background: var(--panel); border: 1px solid var(--border); color: var(--text); font-family: var(--mono); font-size: 11px; padding: 4px 8px; width: 200px; outline: none; }
-  #ws-url:focus { border-color: var(--accent); }
+  #ws-url-form {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  #ws-url {
+    background: linear-gradient(180deg, #0e0d0b, #181614);
+    border: 1px solid var(--border-in);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 8px 12px;
+    width: 220px;
+    outline: none;
+    border-radius: 4px;
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.35);
+  }
+  #ws-url:focus {
+    border-color: rgba(46, 196, 182, 0.5);
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(46, 196, 182, 0.25);
+  }
 
   /* ── Main layout ─────────────────────────────────────── */
   .workspace {
     flex: 1;
     display: grid;
-    grid-template-columns: 260px 1fr 260px;
+    /* minmax(0,1fr) lets the center column shrink below canvas intrinsic width */
+    grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) minmax(240px, 280px);
     gap: 0;
+    max-width: 1600px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 16px;
+    gap: 14px;
+    min-width: 0;
+    overflow-x: hidden;
   }
 
-  /* ── Panels ──────────────────────────────────────────── */
+  /* ── Side panels (rack ears) ─────────────────────────── */
   .panel {
-    background: var(--panel);
-    border-right: 1px solid var(--border);
-    display: flex; flex-direction: column;
+    background:
+      linear-gradient(90deg, rgba(255, 255, 255, 0.03) 0%, transparent 8%),
+      linear-gradient(180deg, #242220 0%, var(--panel-face) 12%, #161412 100%);
+    border: 1px solid var(--border-out);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
     overflow-y: auto;
+    box-shadow:
+      0 8px 24px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 var(--bevel-light),
+      inset 0 -2px 8px rgba(0, 0, 0, 0.25);
   }
-  .panel:last-child { border-right: none; border-left: 1px solid var(--border); }
 
   .panel-title {
-    font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em;
-    color: var(--muted); padding: 14px 16px 10px;
-    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    color: var(--muted);
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.35);
     text-transform: uppercase;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
   }
 
   /* ── Center canvas area ───────────────────────────────── */
   .canvas-area {
-    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
-    padding: 32px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 24px 18px 28px;
     gap: 20px;
-    background: var(--bg);
+    min-width: 0;
+    max-width: 100%;
+    background:
+      radial-gradient(ellipse 70% 50% at 50% 0%, rgba(46, 196, 182, 0.06), transparent 55%),
+      linear-gradient(180deg, #181614 0%, var(--recess) 45%, #0a0908 100%);
+    border: 1px solid var(--border-out);
+    border-radius: 12px;
     overflow-y: auto;
+    box-shadow:
+      inset 0 2px 12px rgba(0, 0, 0, 0.45),
+      0 6px 20px rgba(0, 0, 0, 0.25);
   }
 
+  /* Independent mode: LEFT above RIGHT (not side-by-side) */
   .matrix-dual {
-    display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; align-items: flex-start;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100%;
+    min-width: 0;
   }
-  .matrix-col { text-align: center; }
-  .mirror-hint { color: var(--muted); font-size: 9px; letter-spacing: 0.04em; font-weight: 400; }
+  .matrix-col {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    flex: 0 0 auto;
+  }
+  .mirror-hint {
+    color: var(--dim);
+    font-size: 9px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+    font-family: var(--mono);
+  }
+
+  /* Single-matrix column: avoid block stretch so the bezel hugs the canvas */
+  #wrap-single {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+  #wrap-single .matrix-label {
+    text-align: center;
+    width: 100%;
+    max-width: 100%;
+  }
 
   .matrix-wrapper {
     position: relative;
+    padding: 14px;
+    width: 100%;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    box-sizing: border-box;
+    background: linear-gradient(145deg, #2a2622 0%, #12100e 50%, #0a0908 100%);
+    border-radius: 8px;
+    border: 1px solid #3a3530;
+    box-shadow:
+      inset 0 3px 12px rgba(0, 0, 0, 0.65),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.04),
+      0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+  .matrix-wrapper::after {
+    content: '';
+    position: absolute;
+    inset: 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+    box-shadow: inset 0 0 24px rgba(46, 196, 182, 0.03);
   }
   .matrix-label {
-    font-family: var(--mono); font-size: 10px; color: var(--muted);
-    margin-bottom: 6px; letter-spacing: 0.15em;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 10px;
+    letter-spacing: 0.12em;
+    font-weight: 500;
   }
 
-  #matrix-canvas {
+  #matrix-canvas,
+  #matrix-canvas-left,
+  #matrix-canvas-right {
     display: block;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
     image-rendering: pixelated;
     cursor: crosshair;
-    border: 1px solid var(--border);
-    box-shadow: 0 0 40px rgba(0,229,255,0.05);
+    border-radius: 2px;
+    position: relative;
+    z-index: 1;
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.6),
+      0 0 32px rgba(46, 196, 182, 0.08);
   }
 
   .matrix-info {
-    font-family: var(--mono); font-size: 10px; color: var(--muted);
-    margin-top: 6px; display: flex; gap: 12px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 8px;
+    display: flex;
+    gap: 16px;
+    padding: 8px 14px;
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
   }
 
   /* ── Toolbar ─────────────────────────────────────────── */
   .toolbar {
-    display: flex; gap: 6px; align-items: center;
-    padding: 8px 0;
-    flex-wrap: wrap; justify-content: center;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 10px 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    background: linear-gradient(180deg, #1c1a17, #12100e);
+    border-radius: 8px;
+    border: 1px solid var(--border-in);
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.35);
   }
 
   .tool-btn {
-    background: var(--surface); border: 1px solid var(--border);
-    color: var(--muted); font-family: var(--mono); font-size: 11px;
-    padding: 7px 14px; cursor: pointer; transition: all 0.15s;
-    letter-spacing: 0.08em; text-transform: uppercase;
-    display: flex; align-items: center; gap: 6px;
+    background: linear-gradient(180deg, #3a3632, #252320);
+    border: 1px solid #4a4540;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.15s, color 0.15s, border-color 0.15s;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 5px;
+    box-shadow:
+      0 2px 0 #1a1816,
+      0 3px 6px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 var(--bevel-light);
   }
-  .tool-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .tool-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
-  .tool-btn.danger { border-color: transparent; }
-  .tool-btn.danger:hover { border-color: var(--accent2); color: var(--accent2); }
+  .tool-btn:hover {
+    border-color: rgba(46, 196, 182, 0.45);
+    color: var(--accent-lit);
+    box-shadow:
+      0 1px 0 #1a1816,
+      0 2px 4px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  }
+  .tool-btn:active {
+    transform: translateY(1px);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+  }
+  .tool-btn.active {
+    background: linear-gradient(180deg, #1a6b62, #0f4a44);
+    color: #e8fffc;
+    border-color: #2ec4b6;
+    box-shadow:
+      inset 0 2px 8px rgba(0, 0, 0, 0.35),
+      0 0 12px rgba(46, 196, 182, 0.25);
+  }
+  .tool-btn.danger {
+    border-color: #4a3035;
+  }
+  .tool-btn.danger:hover {
+    border-color: var(--accent2);
+    color: #ffb0c0;
+  }
 
   /* ── Section blocks ──────────────────────────────────── */
-  .section { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+  .section {
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.35);
+  }
   .section-label {
-    font-family: var(--mono); font-size: 10px; color: var(--accent);
-    letter-spacing: 0.18em; margin-bottom: 10px; text-transform: uppercase;
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--amber);
+    letter-spacing: 0.2em;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
   }
 
-  /* ── Mode buttons ─────────────────────────────────────── */
-  .mode-grid { display: flex; flex-direction: column; gap: 4px; }
-  .mode-btn {
-    background: var(--surface); border: 1px solid var(--border);
-    color: var(--text); font-family: var(--sans); font-size: 14px; font-weight: 600;
-    padding: 9px 12px; cursor: pointer; text-align: left;
-    letter-spacing: 0.04em; transition: all 0.15s;
-    display: flex; align-items: center; justify-content: space-between;
+  /* ── Mode buttons (rocker / pad) ─────────────────────── */
+  .mode-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
   }
-  .mode-btn:hover { border-color: var(--accent); background: rgba(0,229,255,0.05); }
-  .mode-btn.active { border-color: var(--accent); background: rgba(0,229,255,0.1); color: var(--accent); }
-  .mode-btn .mode-tag { font-family: var(--mono); font-size: 9px; color: var(--muted); }
-  .mode-btn.active .mode-tag { color: var(--accent); opacity: 0.7; }
+  .mode-btn {
+    background: linear-gradient(180deg, #2e2c28, #1e1c19);
+    border: 1px solid #454038;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 10px 12px;
+    cursor: pointer;
+    text-align: left;
+    letter-spacing: 0.03em;
+    transition: box-shadow 0.15s, border-color 0.15s, color 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-radius: 6px;
+    box-shadow:
+      0 2px 0 #12100e,
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+  .mode-btn:hover {
+    border-color: rgba(46, 196, 182, 0.4);
+    box-shadow: 0 2px 0 #12100e, inset 0 0 0 1px rgba(46, 196, 182, 0.08);
+  }
+  .mode-btn.active {
+    border-color: #c9a227;
+    background: linear-gradient(180deg, #3a3220, #252018);
+    color: #f5e6c8;
+    box-shadow:
+      inset 0 2px 8px rgba(0, 0, 0, 0.35),
+      0 0 0 1px rgba(212, 160, 18, 0.25);
+  }
+  .mode-btn .mode-tag {
+    font-family: var(--mono);
+    font-size: 8px;
+    color: var(--dim);
+    font-weight: 500;
+  }
+  .mode-btn.active .mode-tag {
+    color: var(--amber);
+    opacity: 0.85;
+  }
 
   /* ── Animation grid ──────────────────────────────────── */
-  .anim-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
-  .anim-btn {
-    background: var(--surface); border: 1px solid var(--border);
-    color: var(--muted); font-family: var(--mono); font-size: 10px;
-    padding: 8px 8px; cursor: pointer; transition: all 0.15s;
-    letter-spacing: 0.06em; text-align: center;
+  .anim-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
   }
-  .anim-btn:hover { border-color: var(--accent3); color: var(--accent3); }
-  .anim-btn.active { background: rgba(184,255,60,0.1); border-color: var(--accent3); color: var(--accent3); }
+  .anim-btn {
+    background: linear-gradient(180deg, #2a2825, #1a1816);
+    border: 1px solid #3a3632;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 500;
+    padding: 10px 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.05em;
+    text-align: center;
+    border-radius: 5px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+  .anim-btn:hover {
+    border-color: rgba(125, 217, 111, 0.45);
+    color: #b8e8a8;
+  }
+  .anim-btn.active {
+    background: linear-gradient(180deg, #1e3a1a, #152814);
+    border-color: var(--accent3);
+    color: #d4f5c8;
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.35), 0 0 10px rgba(125, 217, 111, 0.15);
+  }
 
   /* ── Color picker ────────────────────────────────────── */
-  .color-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
-  .color-swatch-grid { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
-  .swatch {
-    width: 22px; height: 22px; cursor: pointer; border: 2px solid transparent;
-    transition: border-color 0.15s, transform 0.1s;
+  .color-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 8px;
   }
-  .swatch:hover { transform: scale(1.2); border-color: rgba(255,255,255,0.3); }
-  .swatch.active { border-color: #fff; }
+  .color-swatch-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .swatch {
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    border: 2px solid #2a2622;
+    border-radius: 4px;
+    transition: transform 0.12s, box-shadow 0.15s;
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  }
+  .swatch:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.45);
+  }
+  .swatch.active {
+    border-color: #f0ebe3;
+    box-shadow: 0 0 0 2px rgba(212, 160, 18, 0.5), 0 2px 8px rgba(0, 0, 0, 0.35);
+  }
 
   input[type="color"] {
-    width: 36px; height: 30px; border: 1px solid var(--border);
-    background: var(--surface); cursor: pointer; padding: 2px;
+    width: 40px;
+    height: 34px;
+    border: 1px solid var(--border-in);
+    border-radius: 4px;
+    background: #1a1816;
+    cursor: pointer;
+    padding: 3px;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.35);
   }
 
   /* ── Sliders ──────────────────────────────────────────── */
-  .slider-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
-  .slider-label { font-family: var(--mono); font-size: 10px; color: var(--muted); width: 80px; flex-shrink: 0; }
-  .slider-val { font-family: var(--mono); font-size: 11px; color: var(--accent); width: 28px; text-align: right; }
-  input[type="range"] {
-    flex: 1; -webkit-appearance: none; height: 2px;
-    background: var(--border); outline: none; cursor: pointer;
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 8px 0;
   }
-  input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 14px; height: 14px; border-radius: 0;
-    background: var(--accent); cursor: pointer; box-shadow: 0 0 6px var(--accent);
+  .slider-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 500;
+    color: var(--muted);
+    width: 76px;
+    flex-shrink: 0;
+    letter-spacing: 0.06em;
+  }
+  .slider-val {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent-lit);
+    width: 30px;
+    text-align: right;
+  }
+  .section input[type="range"],
+  .canvas-area input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 10px;
+    border-radius: 5px;
+    background: linear-gradient(180deg, #0a0908, #1c1a17);
+    outline: none;
+    cursor: pointer;
+    border: 1px solid var(--border-in);
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.45);
+  }
+  .section input[type="range"]::-webkit-slider-thumb,
+  .canvas-area input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: linear-gradient(145deg, #5a5650, #353230);
+    border: 1px solid #6a6560;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    margin-top: -6px;
+  }
+  .section input[type="range"]::-moz-range-thumb,
+  .canvas-area input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: linear-gradient(145deg, #5a5650, #353230);
+    border: 1px solid #6a6560;
+    cursor: pointer;
   }
 
   /* ── Upload area ─────────────────────────────────────── */
   .upload-zone {
-    border: 1px dashed var(--border); padding: 20px 12px;
-    text-align: center; cursor: pointer; transition: all 0.2s;
+    border: 2px dashed #4a4540;
+    border-radius: 8px;
+    padding: 22px 14px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
     position: relative;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.2), transparent);
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.25);
   }
-  .upload-zone:hover, .upload-zone.drag-over {
-    border-color: var(--accent); background: rgba(0,229,255,0.04);
+  .upload-zone:hover,
+  .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(46, 196, 182, 0.06);
   }
-  .upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-  .upload-zone p { font-family: var(--mono); font-size: 10px; color: var(--muted); line-height: 1.6; }
+  .upload-zone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .upload-zone p {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    line-height: 1.65;
+  }
 
-  #upload-preview { max-width: 100%; margin-top: 10px; image-rendering: pixelated; }
+  #upload-preview {
+    max-width: 100%;
+    margin-top: 10px;
+    image-rendering: pixelated;
+    border-radius: 4px;
+    border: 1px solid var(--border-in);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  }
 
-  /* ── Send button ──────────────────────────────────────── */
+  /* ── Primary action (arcade plunger) ─────────────────── */
   .send-btn {
-    width: 100%; background: var(--accent); border: none;
-    color: #000; font-family: var(--sans); font-weight: 900;
-    font-size: 16px; letter-spacing: 0.12em; padding: 12px;
-    cursor: pointer; text-transform: uppercase; transition: all 0.15s;
-    margin-top: 4px;
+    width: 100%;
+    background: linear-gradient(180deg, #e8b018 0%, #b8860b 45%, #8a6508 100%);
+    border: 1px solid #d4a012;
+    color: #1a1408;
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.14em;
+    padding: 13px 12px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: transform 0.1s, box-shadow 0.15s, filter 0.15s;
+    margin-top: 6px;
+    border-radius: 6px;
+    box-shadow:
+      0 4px 0 #5a4208,
+      0 6px 14px var(--amber-glow),
+      inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
   }
-  .send-btn:hover { background: #33ecff; box-shadow: 0 0 20px rgba(0,229,255,0.4); }
-  .send-btn:active { transform: scale(0.99); }
-  .send-btn:disabled { background: var(--dim); color: var(--muted); cursor: not-allowed; box-shadow: none; }
+  .send-btn:hover {
+    filter: brightness(1.08);
+    box-shadow:
+      0 3px 0 #5a4208,
+      0 8px 20px var(--amber-glow),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  }
+  .send-btn:active {
+    transform: translateY(3px);
+    box-shadow:
+      0 1px 0 #5a4208,
+      inset 0 2px 6px rgba(0, 0, 0, 0.25);
+  }
+  .send-btn:disabled {
+    background: linear-gradient(180deg, #4a4845, #353330);
+    border-color: #3a3835;
+    color: var(--dim);
+    cursor: not-allowed;
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.35);
+    text-shadow: none;
+  }
 
-  /* ── Log ──────────────────────────────────────────────── */
+  /* ── Log (paper tape / LCD) ──────────────────────────── */
   #log {
-    font-family: var(--mono); font-size: 10px; color: var(--muted);
-    padding: 10px 16px; line-height: 1.8;
-    height: 140px; overflow-y: auto; background: var(--bg);
-    border-top: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 9px;
+    color: #7a9a7a;
+    padding: 12px 14px;
+    line-height: 1.85;
+    height: 150px;
+    overflow-y: auto;
+    background:
+      linear-gradient(180deg, #0d1a12 0%, #081208 100%);
+    border: 1px solid #1a3020;
+    border-radius: 6px;
+    box-shadow:
+      inset 0 2px 12px rgba(0, 0, 0, 0.5),
+      inset 0 0 40px rgba(0, 40, 20, 0.15);
   }
-  .log-line { display: flex; gap: 8px; }
-  .log-time { color: var(--dim); }
-  .log-ok { color: var(--accent3); }
-  .log-err { color: var(--accent2); }
-  .log-info { color: var(--accent); }
+  .log-line {
+    display: flex;
+    gap: 10px;
+  }
+  .log-time {
+    color: #3a5a45;
+    flex-shrink: 0;
+  }
+  .log-ok {
+    color: #8fdf7a;
+    text-shadow: 0 0 8px rgba(125, 217, 111, 0.35);
+  }
+  .log-err {
+    color: #ff8a9a;
+    text-shadow: 0 0 8px rgba(232, 72, 106, 0.25);
+  }
+  .log-info {
+    color: #6ec4b8;
+    text-shadow: 0 0 6px rgba(46, 196, 182, 0.25);
+  }
 
   /* ── Misc ─────────────────────────────────────────────── */
-  .sep { height: 1px; background: var(--border); margin: 4px 0; }
+  .sep {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.05);
+    margin: 6px 0;
+  }
   .tag {
-    font-family: var(--mono); font-size: 9px; background: var(--surface);
-    border: 1px solid var(--border); color: var(--muted); padding: 2px 6px;
-    letter-spacing: 0.1em;
+    font-family: var(--mono);
+    font-size: 8px;
+    font-weight: 600;
+    background: linear-gradient(180deg, #2a2825, #1a1816);
+    border: 1px solid #4a4540;
+    color: var(--muted);
+    padding: 3px 8px;
+    letter-spacing: 0.12em;
+    border-radius: 3px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .hint-text {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--dim);
+    margin-top: 10px;
+    line-height: 1.55;
+  }
+
+  /* ── Form controls ───────────────────────────────────── */
+  input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  label {
+    cursor: pointer;
   }
 
   /* scrollbar */
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-track { background: var(--bg); }
-  ::-webkit-scrollbar-thumb { background: var(--border); }
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0e0d0b;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #4a4540, #2a2825);
+    border-radius: 4px;
+    border: 1px solid #1a1816;
+  }
+
+  @media (max-width: 1100px) {
+    .workspace {
+      grid-template-columns: 1fr;
+      padding: 12px;
+    }
+    .panel {
+      max-height: none;
+    }
+  }
 </style>
 </head>
 <body>
 
 <!-- ── Header ────────────────────────────────────────────────────────────── -->
 <header>
-  <div class="logo">
+    <div class="logo">
     <span class="logo-dot"></span>
     LED MATRIX CTRL
     <span class="tag">8×24</span>
@@ -327,7 +886,7 @@
         <button class="mode-btn active" id="pair-mirror" onclick="setPairMode(true)">MIRROR <span class="mode-tag">FACE</span></button>
         <button class="mode-btn" id="pair-ind" onclick="setPairMode(false)">INDEPENDENT <span class="mode-tag">2×576 B</span></button>
       </div>
-      <p style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:8px;line-height:1.5;">Mirror: one 8×24 buffer, right LED mirrors X. Independent: separate left/right (1152-byte binary).</p>
+      <p class="hint-text">Mirror: one 8×24 buffer, right LED mirrors X. Independent: separate left/right (1152-byte binary).</p>
     </div>
 
     <div class="section">
@@ -357,7 +916,7 @@
         <input type="file" id="img-input" accept="image/*,image/gif,video/mp4,video/webm,video/quicktime,.gif,.mp4,.webm" onchange="handleImageUpload(event)">
         <p>DROP FILE or browse<br><br>Still: PNG, JPEG, WebP…<br>GIF: decoded to frames<br>Video: MP4 / WebM (streamed)<br><br>Mirror: 8×24 · Independent: 16×24</p>
       </div>
-      <canvas id="upload-preview" width="8" height="24" style="display:none; width:100%; margin-top:10px;"></canvas>
+      <canvas id="upload-preview" width="24" height="8" style="display:none; width:100%; margin-top:10px;"></canvas>
       <p id="anim-status" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:8px;line-height:1.5;display:none;"></p>
       <div id="anim-controls" style="display:none;margin-top:10px;">
         <div class="slider-row" style="margin-bottom:8px;">
@@ -389,22 +948,22 @@
   <!-- CENTER: Matrix Canvas -->
   <div class="canvas-area">
     <div id="wrap-single">
-      <div class="matrix-label">// MATRIX PREVIEW — 8 × 24 <span class="mirror-hint">(mirrored to right strip)</span></div>
+      <div class="matrix-label">// MATRIX PREVIEW — 8 × 24 buffer, horizontal view <span class="mirror-hint">(mirrored to right strip)</span></div>
       <div class="matrix-wrapper">
-        <canvas id="matrix-canvas" width="8" height="24"></canvas>
+        <canvas id="matrix-canvas" width="24" height="8"></canvas>
       </div>
     </div>
     <div id="wrap-dual" class="matrix-dual" style="display:none">
       <div class="matrix-col">
         <div class="matrix-label">LEFT · PIN 5</div>
         <div class="matrix-wrapper">
-          <canvas id="matrix-canvas-left" width="8" height="24"></canvas>
+          <canvas id="matrix-canvas-left" width="24" height="8"></canvas>
         </div>
       </div>
       <div class="matrix-col">
         <div class="matrix-label">RIGHT · PIN 18</div>
         <div class="matrix-wrapper">
-          <canvas id="matrix-canvas-right" width="8" height="24"></canvas>
+          <canvas id="matrix-canvas-right" width="24" height="8"></canvas>
         </div>
       </div>
     </div>
@@ -424,7 +983,7 @@
 
     <!-- Draw color palette -->
     <div style="width:100%; max-width:340px;">
-      <div class="section-label" style="font-size:10px;color:var(--accent);letter-spacing:0.18em;margin-bottom:8px;">DRAW COLOR</div>
+      <div class="section-label" style="margin-bottom:8px;">DRAW COLOR</div>
       <div class="color-swatch-grid" id="palette"></div>
       <div class="color-row">
         <input type="color" id="draw-color" value="#00e5ff" oninput="onDrawColorChange(this.value)">
@@ -499,12 +1058,77 @@
 // ── Constants ─────────────────────────────────────────────────────────────────
 const W = 8, H = 24;
 const SCALE = 28; // px per cell in canvas
+/** Preview only: logical buffer stays W×H (8×24); on-screen cells are drawn H×W (24×8) to match physical install. */
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let pixels = new Array(W * H).fill('#000000');
 let pixelsLeft = new Array(W * H).fill('#000000');
 let pixelsRight = new Array(W * H).fill('#000000');
 let mirrorPair = true;
+
+const MAX_UNDO = 50;
+let undoStack = [];
+let redoStack = [];
+
+function cloneBuffers() {
+  return {
+    mirrorPair,
+    pixels: [...pixels],
+    pixelsLeft: [...pixelsLeft],
+    pixelsRight: [...pixelsRight],
+  };
+}
+
+function applyBuffers(s) {
+  mirrorPair = s.mirrorPair;
+  pixels = [...s.pixels];
+  pixelsLeft = [...s.pixelsLeft];
+  pixelsRight = [...s.pixelsRight];
+  const ws = document.getElementById('wrap-single');
+  const wd = document.getElementById('wrap-dual');
+  if (ws) ws.style.display = mirrorPair ? '' : 'none';
+  if (wd) wd.style.display = mirrorPair ? 'none' : 'flex';
+  document.getElementById('pair-mirror')?.classList.toggle('active', mirrorPair);
+  document.getElementById('pair-ind')?.classList.toggle('active', !mirrorPair);
+  const sp = document.getElementById('spec-pair');
+  if (sp) sp.textContent = mirrorPair ? 'mirror' : 'independent';
+}
+
+function pushUndo() {
+  undoStack.push(cloneBuffers());
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
+  redoStack = [];
+}
+
+function undoDraw() {
+  if (undoStack.length === 0) return;
+  redoStack.push(cloneBuffers());
+  applyBuffers(undoStack.pop());
+  updatePaintCount();
+  renderCanvas();
+  if (autoPush) sendDraw();
+}
+
+function redoDraw() {
+  if (redoStack.length === 0) return;
+  undoStack.push(cloneBuffers());
+  applyBuffers(redoStack.pop());
+  updatePaintCount();
+  renderCanvas();
+  if (autoPush) sendDraw();
+}
+
+function pixelsAlreadySolidColor(c) {
+  const cl = c.toLowerCase();
+  if (mirrorPair) {
+    for (let i = 0; i < W * H; i++) if (pixels[i].toLowerCase() !== cl) return false;
+  } else {
+    for (let i = 0; i < W * H; i++) {
+      if (pixelsLeft[i].toLowerCase() !== cl || pixelsRight[i].toLowerCase() !== cl) return false;
+    }
+  }
+  return true;
+}
 let ws = null;
 let connected = false;
 let currentTool = 'pencil';
@@ -524,10 +1148,9 @@ const canvasRight = document.getElementById('matrix-canvas-right');
 const ctxRight = canvasRight.getContext('2d');
 
 function sizeCanvas(cv) {
-  cv.width  = W * SCALE;
-  cv.height = H * SCALE;
-  cv.style.width  = (W * SCALE) + 'px';
-  cv.style.height = (H * SCALE) + 'px';
+  cv.width  = H * SCALE;
+  cv.height = W * SCALE;
+  /* Display size from CSS (width:100%; height:auto) so the grid fits narrow viewports */
 }
 sizeCanvas(canvas);
 sizeCanvas(canvasLeft);
@@ -542,11 +1165,11 @@ function renderOne(context, pxArr) {
     for (let x = 0; x < W; x++) {
       const c = pxArr[y * W + x];
       context.fillStyle = c;
-      context.fillRect(x * SCALE, y * SCALE, SCALE, SCALE);
+      context.fillRect(y * SCALE, x * SCALE, SCALE, SCALE);
       if (showGrid) {
-        context.strokeStyle = 'rgba(42,42,56,0.7)';
+        context.strokeStyle = 'rgba(55, 50, 44, 0.75)';
         context.lineWidth = 0.5;
-        context.strokeRect(x * SCALE + 0.25, y * SCALE + 0.25, SCALE - 0.5, SCALE - 0.5);
+        context.strokeRect(y * SCALE + 0.25, x * SCALE + 0.25, SCALE - 0.5, SCALE - 0.5);
       }
     }
   }
@@ -619,7 +1242,12 @@ function getCellFromCanvas(cv, e) {
   const r = cv.getBoundingClientRect();
   const px = (e.clientX - r.left) / r.width * cv.width;
   const py = (e.clientY - r.top) / r.height * cv.height;
-  return { x: Math.floor(px / SCALE), y: Math.floor(py / SCALE) };
+  const col = Math.floor(px / SCALE);
+  const row = Math.floor(py / SCALE);
+  return {
+    x: Math.max(0, Math.min(W - 1, row)),
+    y: Math.max(0, Math.min(H - 1, col)),
+  };
 }
 
 function pixelArrayForSide(side) {
@@ -649,8 +1277,35 @@ function applyTool(side, x, y) {
   if (currentTool === 'fill') bucketFill(px, x, y, drawColor);
 }
 
+/** Right-click erase: ignores current tool; uses brush size like the eraser. */
+function applyEraseAt(side, x, y) {
+  if (x < 0 || x >= W || y < 0 || y >= H) return;
+  const px = pixelArrayForSide(side);
+  const bs = parseInt(document.getElementById('brush-size').value, 10);
+  const half = Math.floor(bs / 2);
+  for (let dy = -half; dy < bs - half; dy++) {
+    for (let dx = -half; dx < bs - half; dx++) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
+      px[ny * W + nx] = '#000000';
+    }
+  }
+}
+
 function bindCanvasPointer(cv, side) {
+  cv.addEventListener('contextmenu', e => { e.preventDefault(); });
   cv.addEventListener('mousedown', e => {
+    if (e.button === 2) {
+      e.preventDefault();
+      pushUndo();
+      const { x, y } = getCellFromCanvas(cv, e);
+      applyEraseAt(side, x, y);
+      updatePaintCount();
+      renderCanvas();
+      if (autoPush) sendDraw();
+      return;
+    }
+    if (currentTool !== 'eyedrop') pushUndo();
     isDrawing = true;
     const { x, y } = getCellFromCanvas(cv, e);
     applyTool(side, x, y);
@@ -662,16 +1317,26 @@ function bindCanvasPointer(cv, side) {
     const { x, y } = getCellFromCanvas(cv, e);
     document.getElementById('cursor-pos').textContent =
       (side === 'right' ? 'R ' : side === 'left' ? 'L ' : '') + `X:${x} Y:${y}`;
+    if (e.buttons & 2) {
+      applyEraseAt(side, x, y);
+      updatePaintCount();
+      renderCanvas();
+      if (autoPush) sendDraw();
+      return;
+    }
     if (!isDrawing) return;
     applyTool(side, x, y);
     updatePaintCount();
     renderCanvas();
     if (autoPush) sendDraw();
   });
-  cv.addEventListener('mouseup', () => { isDrawing = false; });
+  cv.addEventListener('mouseup', e => {
+    if (e.button !== 2) isDrawing = false;
+  });
   cv.addEventListener('mouseleave', () => { isDrawing = false; });
   cv.addEventListener('touchstart', e => {
     e.preventDefault();
+    if (currentTool !== 'eyedrop') pushUndo();
     isDrawing = true;
     const t = e.touches[0];
     const { x, y } = getCellFromCanvas(cv, t);
@@ -721,6 +1386,7 @@ function updatePaintCount() {
 
 function setPairMode(mirror) {
   if (mirror === mirrorPair) return;
+  pushUndo();
   resetUploadAnimationUi();
   if (mirror) {
     pixels = [...pixelsLeft];
@@ -785,6 +1451,7 @@ function sendOff() {
 
 // ── Canvas actions ─────────────────────────────────────────────────────────────
 function clearCanvas() {
+  pushUndo();
   if (mirrorPair) pixels.fill('#000000');
   else {
     pixelsLeft.fill('#000000');
@@ -802,6 +1469,7 @@ function invertArr(arr) {
 }
 
 function invertCanvas() {
+  pushUndo();
   if (mirrorPair) pixels = invertArr(pixels);
   else {
     pixelsLeft = invertArr(pixelsLeft);
@@ -819,6 +1487,7 @@ function mirrorHOne(arr) {
 }
 
 function mirrorHCanvas() {
+  pushUndo();
   if (mirrorPair) pixels = mirrorHOne(pixels);
   else {
     pixelsLeft = mirrorHOne(pixelsLeft);
@@ -828,6 +1497,7 @@ function mirrorHCanvas() {
 }
 
 function shiftUp() {
+  pushUndo();
   if (mirrorPair) {
     pixels = [...pixels.slice(W), ...pixels.slice(0, W)];
   } else {
@@ -838,6 +1508,7 @@ function shiftUp() {
 }
 
 function shiftDown() {
+  pushUndo();
   if (mirrorPair) {
     pixels = [...pixels.slice(-W), ...pixels.slice(0, -W)];
   } else {
@@ -848,6 +1519,7 @@ function shiftDown() {
 }
 
 function randomize() {
+  pushUndo();
   const colors = ['#ff0000', '#00ff00', '#0000ff', '#ff8800', '#00ffff', '#ff00ff', '#ffffff', '#ffff00'];
   const rnd = () => (Math.random() < 0.3 ? colors[Math.floor(Math.random() * colors.length)] : '#000000');
   if (mirrorPair) pixels = pixels.map(() => rnd());
@@ -869,6 +1541,7 @@ function onBrightness(el) {
 
 // ── Fill ──────────────────────────────────────────────────────────────────────
 function fillPreview() {
+  pushUndo();
   const c = document.getElementById('fill-color').value;
   if (mirrorPair) pixels.fill(c);
   else {
@@ -881,6 +1554,7 @@ function fillPreview() {
 function sendFill() {
   const c = document.getElementById('fill-color').value;
   const r = parseInt(c.slice(1, 3), 16), g = parseInt(c.slice(3, 5), 16), b = parseInt(c.slice(5, 7), 16);
+  if (!pixelsAlreadySolidColor(c)) pushUndo();
   sendJson({ cmd: 'fill', r, g, b });
   if (mirrorPair) pixels.fill(c);
   else {
@@ -908,6 +1582,41 @@ let gifPatchImageData = null;
 let gifFullCanvas = null;
 let gifFullCtx = null;
 const MAX_GIF_FRAMES = 360;
+
+let gifuctModulePromise = null;
+/** Fetch decoder source, strip source maps, then import() as a blob URL — avoids file:// + https:// module graph quirks. */
+async function loadGifuctModule() {
+  if (gifuctModulePromise != null) return gifuctModulePromise;
+  gifuctModulePromise = (async () => {
+    const stripMap = (s) => s.replace(/\r?\n\/\/# sourceMappingURL=[^\n\r]+$/, '');
+    const importFromText = async (text) => {
+      const blob = new Blob([stripMap(text)], { type: 'application/javascript' });
+      const url = URL.createObjectURL(blob);
+      try {
+        return await import(url);
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    };
+    const sources = [
+      new URL('gifuct-js.bundle.mjs', document.baseURI).href,
+      'https://esm.sh/gifuct-js@2.1.2/es2022/gifuct-js.bundle.mjs',
+    ];
+    let lastErr = null;
+    for (const src of sources) {
+      try {
+        const r = await fetch(src);
+        if (!r.ok) continue;
+        return await importFromText(await r.text());
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    const msg = lastErr && lastErr.message ? lastErr.message : String(lastErr);
+    throw new Error('GIF decoder unavailable: ' + msg);
+  })();
+  return gifuctModulePromise;
+}
 
 function rgbToHex(r, g, b) {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
@@ -1024,7 +1733,7 @@ function drawGifPatch(frame) {
 
 function rasterGifToLedFrames(buffer) {
   return (async () => {
-    const { parseGIF, decompressFrames } = await import('https://esm.sh/gifuct-js@2.1.2');
+    const { parseGIF, decompressFrames } = await loadGifuctModule();
     const gif = parseGIF(buffer);
     const frames = decompressFrames(gif, true);
     if (!frames.length) throw new Error('No frames in GIF');
@@ -1071,34 +1780,121 @@ function rasterGifToLedFrames(buffer) {
   })();
 }
 
+/** Sniff first bytes + MIME; magic wins over Content-Type when they disagree. */
+const SNIFF_BYTES = 65536;
+const HEIF_IMAGE_BRANDS = new Set(['avif', 'avis', 'mif1', 'msf1', 'heic', 'heix', 'hevc', 'hevx']);
+
+function kindFromMime(type) {
+  const t = (type || '').toLowerCase().trim();
+  if (!t) return null;
+  if (t === 'image/gif') return 'gif';
+  if (t.startsWith('video/')) return 'video';
+  if (t.startsWith('image/')) return 'image';
+  return null;
+}
+
+function detectUploadKindFromBuffer(u8) {
+  const n = u8.length;
+  if (n < 4) return 'unknown';
+
+  if (n >= 6 &&
+      u8[0] === 0x47 && u8[1] === 0x49 && u8[2] === 0x46 && u8[3] === 0x38 &&
+      ((u8[4] === 0x37 && u8[5] === 0x61) || (u8[4] === 0x39 && u8[5] === 0x61))) {
+    return 'gif';
+  }
+
+  if (n >= 8 &&
+      u8[0] === 0x89 && u8[1] === 0x50 && u8[2] === 0x4e && u8[3] === 0x47 &&
+      u8[4] === 0x0d && u8[5] === 0x0a && u8[6] === 0x1a && u8[7] === 0x0a) {
+    return 'image';
+  }
+
+  if (n >= 3 && u8[0] === 0xff && u8[1] === 0xd8 && u8[2] === 0xff) return 'image';
+
+  if (n >= 12 &&
+      u8[0] === 0x52 && u8[1] === 0x49 && u8[2] === 0x46 && u8[3] === 0x46 &&
+      u8[8] === 0x57 && u8[9] === 0x45 && u8[10] === 0x42 && u8[11] === 0x50) {
+    return 'image';
+  }
+
+  if (n >= 2 && u8[0] === 0x42 && u8[1] === 0x4d) return 'image';
+
+  if (n >= 4 &&
+      ((u8[0] === 0x49 && u8[1] === 0x49 && u8[2] === 0x2a && u8[3] === 0x00) ||
+       (u8[0] === 0x4d && u8[1] === 0x4d && u8[2] === 0x00 && u8[3] === 0x2a))) {
+    return 'image';
+  }
+
+  if (n >= 4 && u8[0] === 0x1a && u8[1] === 0x45 && u8[2] === 0xdf && u8[3] === 0xa3) {
+    return 'video';
+  }
+
+  if (n >= 4 && u8[0] === 0x4f && u8[1] === 0x67 && u8[2] === 0x67 && u8[3] === 0x53) {
+    return 'video';
+  }
+
+  if (n >= 12 &&
+      u8[0] === 0x52 && u8[1] === 0x49 && u8[2] === 0x46 && u8[3] === 0x46 &&
+      u8[8] === 0x41 && u8[9] === 0x56 && u8[10] === 0x49 && u8[11] === 0x20) {
+    return 'video';
+  }
+
+  if (n >= 4 && u8[0] === 0x46 && u8[1] === 0x4c && u8[2] === 0x56 && u8[3] === 0x01) {
+    return 'video';
+  }
+
+  for (let i = 0; i <= n - 12; i++) {
+    if (u8[i] === 0x66 && u8[i + 1] === 0x74 && u8[i + 2] === 0x79 && u8[i + 3] === 0x70) {
+      const brand = String.fromCharCode(u8[i + 4], u8[i + 5], u8[i + 6], u8[i + 7]);
+      if (HEIF_IMAGE_BRANDS.has(brand)) return 'image';
+      return 'video';
+    }
+  }
+
+  const headText = new TextDecoder('utf-8', { fatal: false }).decode(u8.slice(0, Math.min(512, n)));
+  if (/^\s*<\?xml/i.test(headText) && /<svg[\s>/]/i.test(headText)) return 'image';
+  if (/^\s*<svg[\s>/]/i.test(headText)) return 'image';
+
+  return 'unknown';
+}
+
+function resolveUploadKind(magicKind, mimeKind) {
+  if (magicKind !== 'unknown') return magicKind;
+  return mimeKind;
+}
+
 function previewBufferToCanvas(buf) {
   const prev = document.getElementById('upload-preview');
   const pctx = prev.getContext('2d');
   if (mirrorPair) {
-    prev.width = W;
-    prev.height = H;
-    const imgData = pctx.createImageData(W, H);
-    for (let i = 0; i < W * H; i++) {
-      imgData.data[i * 4]     = buf[i * 3];
-      imgData.data[i * 4 + 1] = buf[i * 3 + 1];
-      imgData.data[i * 4 + 2] = buf[i * 3 + 2];
-      imgData.data[i * 4 + 3] = 255;
+    prev.width = H;
+    prev.height = W;
+    const imgData = pctx.createImageData(H, W);
+    for (let ly = 0; ly < H; ly++) {
+      for (let lx = 0; lx < W; lx++) {
+        const i = ly * W + lx;
+        const o = (lx * H + ly) * 4;
+        imgData.data[o]     = buf[i * 3];
+        imgData.data[o + 1] = buf[i * 3 + 1];
+        imgData.data[o + 2] = buf[i * 3 + 2];
+        imgData.data[o + 3] = 255;
+      }
     }
     pctx.putImageData(imgData, 0, 0);
   } else {
-    prev.width = W * 2;
-    prev.height = H;
-    const imgData = pctx.createImageData(W * 2, H);
+    prev.width = H * 2;
+    prev.height = W;
+    const imgData = pctx.createImageData(H * 2, W);
     const half = W * H * 3;
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        const i = y * W + x;
-        const oL = (y * (W * 2) + x) * 4;
+    for (let ly = 0; ly < H; ly++) {
+      for (let lx = 0; lx < W; lx++) {
+        const i = ly * W + lx;
+        const oL = (lx * (H * 2) + ly) * 4;
         imgData.data[oL]     = buf[i * 3];
         imgData.data[oL + 1] = buf[i * 3 + 1];
         imgData.data[oL + 2] = buf[i * 3 + 2];
         imgData.data[oL + 3] = 255;
-        const oR = (y * (W * 2) + (x + W)) * 4;
+        const oR = (lx * (H * 2) + (ly + H)) * 4;
         imgData.data[oR]     = buf[half + i * 3];
         imgData.data[oR + 1] = buf[half + i * 3 + 1];
         imgData.data[oR + 2] = buf[half + i * 3 + 2];
@@ -1112,15 +1908,29 @@ function previewBufferToCanvas(buf) {
   prev.style.width = '100%';
 }
 
-function handleImageUpload(e) {
+async function handleImageUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
   resetUploadAnimationUi();
 
-  const isVid = file.type.startsWith('video/');
-  const isGif = file.type === 'image/gif' || /\.gif$/i.test(file.name);
+  let head;
+  try {
+    head = new Uint8Array(await file.slice(0, Math.min(SNIFF_BYTES, file.size)).arrayBuffer());
+  } catch (err) {
+    log('Could not read file: ' + (err && err.message ? err.message : err), 'err');
+    return;
+  }
 
-  if (isVid) {
+  const magicKind = detectUploadKindFromBuffer(head);
+  const mimeKind = kindFromMime(file.type);
+  const kind = resolveUploadKind(magicKind, mimeKind);
+
+  if (kind == null) {
+    log('Unrecognized file type (needs recognizable magic bytes or a valid image/video MIME type)', 'err');
+    return;
+  }
+
+  if (kind === 'video') {
     animationVideoUrl = URL.createObjectURL(file);
     animationVideo = document.createElement('video');
     animationVideo.muted = true;
@@ -1131,6 +1941,7 @@ function handleImageUpload(e) {
     animationVideo.addEventListener('loadeddata', () => {
       if (!animationVideo) return;
       uploadKind = 'video';
+      pushUndo();
       const v = animationVideo;
       const sw = mirrorPair ? W : W * 2;
       const scaleCanvas = document.createElement('canvas');
@@ -1169,12 +1980,13 @@ function handleImageUpload(e) {
     return;
   }
 
-  if (isGif) {
+  if (kind === 'gif') {
     file.arrayBuffer().then(async (buffer) => {
       try {
         const { outFrames, delays, gw, gh, count } = await rasterGifToLedFrames(buffer);
         animationFrames = outFrames;
         animationDelays = delays;
+        pushUndo();
         uploadKind = 'gif';
         uploadPixels = outFrames[0];
         const p = bufferToDrawPixels(outFrames[0]);
@@ -1203,13 +2015,14 @@ function handleImageUpload(e) {
   const img = new Image();
   img.onload = () => {
     uploadKind = 'static';
-    const prev = document.getElementById('upload-preview');
-    const pctx = prev.getContext('2d');
+    pushUndo();
+    const sample = document.createElement('canvas');
+    const sctx = sample.getContext('2d');
     if (mirrorPair) {
-      prev.width = W;
-      prev.height = H;
-      pctx.drawImage(img, 0, 0, W, H);
-      const data = pctx.getImageData(0, 0, W, H).data;
+      sample.width = W;
+      sample.height = H;
+      sctx.drawImage(img, 0, 0, W, H);
+      const data = sctx.getImageData(0, 0, W, H).data;
       uploadPixels = new Uint8Array(W * H * 3);
       pixels = [];
       for (let i = 0; i < W * H; i++) {
@@ -1218,12 +2031,13 @@ function handleImageUpload(e) {
         uploadPixels[i * 3 + 2] = data[i * 4 + 2];
         pixels.push(rgbToHex(data[i * 4], data[i * 4 + 1], data[i * 4 + 2]));
       }
-      log(`Image loaded: ${img.naturalWidth}×${img.naturalHeight} → 8×24`, 'info');
+      previewBufferToCanvas(uploadPixels);
+      log(`Image loaded: ${img.naturalWidth}×${img.naturalHeight} → 8×24 buffer`, 'info');
     } else {
-      prev.width = W * 2;
-      prev.height = H;
-      pctx.drawImage(img, 0, 0, W * 2, H);
-      const data = pctx.getImageData(0, 0, W * 2, H).data;
+      sample.width = W * 2;
+      sample.height = H;
+      sctx.drawImage(img, 0, 0, W * 2, H);
+      const data = sctx.getImageData(0, 0, W * 2, H).data;
       uploadPixels = new Uint8Array(W * H * 3 * 2);
       pixelsLeft = [];
       pixelsRight = [];
@@ -1248,11 +2062,9 @@ function handleImageUpload(e) {
           pixelsRight.push(rgbToHex(data[oR], data[oR + 1], data[oR + 2]));
         }
       }
-      log(`Image loaded: ${img.naturalWidth}×${img.naturalHeight} → 16×24 (split L/R)`, 'info');
+      previewBufferToCanvas(uploadPixels);
+      log(`Image loaded: ${img.naturalWidth}×${img.naturalHeight} → 16×24 buffer (split L/R)`, 'info');
     }
-    prev.style.display = 'block';
-    prev.style.imageRendering = 'pixelated';
-    prev.style.width = '100%';
     renderCanvas();
     document.getElementById('send-image-btn').disabled = false;
   };
@@ -1486,6 +2298,24 @@ zone.addEventListener('drop', e => {
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  const el = e.target;
+  if (!(el instanceof Element)) return;
+  if (el.closest('input, textarea, select, [contenteditable="true"]')) return;
+  const mod = e.ctrlKey || e.metaKey;
+  if (!mod) return;
+  if (e.key === 'z' || e.key === 'Z') {
+    if (e.shiftKey) redoDraw();
+    else undoDraw();
+    e.preventDefault();
+    return;
+  }
+  if (e.key === 'y' || e.key === 'Y') {
+    redoDraw();
+    e.preventDefault();
+  }
+});
+
 buildPalette();
 renderCanvas();
 log('LED Matrix Controller ready', 'info');
