@@ -13,6 +13,12 @@
 #define WIDTH     8
 #define HEIGHT    24
 #define NUM_LEDS  (WIDTH * HEIGHT)
+// Strip protocol/channel order on the wire. If red/green/blue are still swapped
+// after disabling correction below, this is the one line to change.
+#define LED_COLOR_ORDER GRB
+// Keep browser-picked RGB values faithful on the LEDs; FastLED's "typical" 5050
+// correction intentionally tints whites/cyans warmer and was making colors look wrong.
+#define LED_COLOR_CORRECTION UncorrectedColor
 // Global dimming uses 8-bit scale: low values crush pastels (only ~N distinct steps per channel).
 #define BRIGHTNESS 128
 
@@ -228,12 +234,10 @@ void startupThrobber() {
 
 void setup() {
   Serial.begin(115200);
-  // 5050 SMD package + WS2812B IC (same as BTF-LIGHTING “WS2812B / 5050SMD” listings).
-  // Protocol: 800 kHz, GRB on the wire (CRGB in code is still R,G,B).
-  FastLED.addLeds<WS2812B, LEFT_PIN,  GRB>(leftLeds,  NUM_LEDS);
-  FastLED.addLeds<WS2812B, RIGHT_PIN, GRB>(rightLeds, NUM_LEDS);
-  // Same correction as TypicalLEDStrip — tuned for green-heavy 5050 RGB modules.
-  FastLED.setCorrection(TypicalSMD5050);
+  // WS2812-family timing with configurable wire order (CRGB in code is still R,G,B).
+  FastLED.addLeds<WS2812B, LEFT_PIN,  LED_COLOR_ORDER>(leftLeds,  NUM_LEDS);
+  FastLED.addLeds<WS2812B, RIGHT_PIN, LED_COLOR_ORDER>(rightLeds, NUM_LEDS);
+  FastLED.setCorrection(LED_COLOR_CORRECTION);
   FastLED.setBrightness(BRIGHTNESS);
   fillBoth(CRGB::Black);
   FastLED.show();
